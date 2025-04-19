@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "TonieToolbox"
+dynamic = ["version"]
+description = "Convert audio files to Tonie box compatible format"
+readme = "README.md"
+authors = [
+    {name = "Quentendo64", email = "quentin@wohlfeil.at"}
+]
+license = "GPL-3.0-or-later"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+]
+dependencies = [
+    "protobuf<=3.19.0",
+]
+requires-python = ">=3.6"
+
+[project.urls]
+Homepage = "https://github.com/Quentendo64/TonieToolbox"
+"Bug Tracker" = "https://github.com/Quentendo64/TonieToolbox/issues"
+
+[project.scripts]
+tonietoolbox = "TonieToolbox.__main__:main"
