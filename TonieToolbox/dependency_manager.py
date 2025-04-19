@@ -280,12 +280,13 @@ def install_package(package_name):
         logger.error("Failed to install %s: %s", package_name, e)
         return False
 
-def ensure_dependency(dependency_name):
+def ensure_dependency(dependency_name, auto_download=False):
     """
     Ensure that a dependency is available, downloading it if necessary.
     
     Args:
         dependency_name (str): Name of the dependency ('ffmpeg' or 'opusenc')
+        auto_download (bool): Whether to automatically download or install the dependency if not found
         
     Returns:
         str: Path to the binary if available, None otherwise
@@ -308,6 +309,11 @@ def ensure_dependency(dependency_name):
         logger.info("Found %s in PATH: %s", dependency_name, path_binary)
         return path_binary
     
+    # If auto_download is not enabled, don't try to install or download
+    if not auto_download:
+        logger.warning("%s not found in PATH and auto-download is disabled. Use --auto-download to enable automatic installation.", dependency_name)
+        return None
+        
     # If not in PATH, check if we should install via package manager
     if 'package' in DEPENDENCIES[dependency_name].get(system, {}):
         package_name = DEPENDENCIES[dependency_name][system]['package']
@@ -359,20 +365,26 @@ def ensure_dependency(dependency_name):
     logger.error("Failed to set up %s", dependency_name)
     return None
 
-def get_ffmpeg_binary():
+def get_ffmpeg_binary(auto_download=False):
     """
     Get the path to the FFmpeg binary, downloading it if necessary.
+    
+    Args:
+        auto_download (bool): Whether to automatically download or install if not found
     
     Returns:
         str: Path to the FFmpeg binary if available, None otherwise
     """
-    return ensure_dependency('ffmpeg')
+    return ensure_dependency('ffmpeg', auto_download)
 
-def get_opus_binary():
+def get_opus_binary(auto_download=False):
     """
     Get the path to the opusenc binary, downloading it if necessary.
+    
+    Args:
+        auto_download (bool): Whether to automatically download or install if not found
     
     Returns:
         str: Path to the opusenc binary if available, None otherwise
     """
-    return ensure_dependency('opusenc')
+    return ensure_dependency('opusenc', auto_download)

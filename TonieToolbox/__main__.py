@@ -71,17 +71,17 @@ def main():
 
     ffmpeg_binary = args.ffmpeg
     if ffmpeg_binary is None:
-        ffmpeg_binary = get_ffmpeg_binary()
+        ffmpeg_binary = get_ffmpeg_binary(args.auto_download)
         if ffmpeg_binary is None:
-            logger.error("Could not find FFmpeg. Please install FFmpeg or specify its location using --ffmpeg")
+            logger.error("Could not find FFmpeg. Please install FFmpeg or specify its location using --ffmpeg or use --auto-download")
             sys.exit(1)
         logger.debug("Using FFmpeg binary: %s", ffmpeg_binary)
 
     opus_binary = args.opusenc
     if opus_binary is None:
-        opus_binary = get_opus_binary() 
+        opus_binary = get_opus_binary(args.auto_download) 
         if opus_binary is None:
-            logger.error("Could not find opusenc. Please install opus-tools or specify its location using --opusenc")
+            logger.error("Could not find opusenc. Please install opus-tools or specify its location using --opusenc or use --auto-download")
             sys.exit(1)
         logger.debug("Using opusenc binary: %s", opus_binary)
 
@@ -123,7 +123,7 @@ def main():
         logger.debug("Using default output location: %s", out_filename)
 
     if args.append_tonie_tag:
-        # Validate that the value is an 8-character hex value
+        logger.debug("Appending Tonie tag to output filename")
         hex_tag = args.append_tonie_tag
         logger.debug("Validating tag: %s", hex_tag)
         if not all(c in '0123456789abcdefABCDEF' for c in hex_tag) or len(hex_tag) != 8:
@@ -137,7 +137,7 @@ def main():
 
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
-                     args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp)
+                     args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, args.auto_download)
     logger.info("Successfully created Tonie file: %s", out_filename)
 
 

@@ -277,7 +277,7 @@ def fix_tonie_header(out_file, chapters, timestamp, sha):
 
 
 def create_tonie_file(output_file, input_files, no_tonie_header=False, user_timestamp=None,
-                     bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False):
+                     bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False, auto_download=False):
     """
     Create a Tonie file from input files.
     
@@ -291,6 +291,7 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
         ffmpeg_binary: Path to ffmpeg binary
         opus_binary: Path to opusenc binary
         keep_temp: Whether to keep temporary opus files for testing
+        auto_download: Whether to automatically download dependencies if not found
     """
     from .audio_conversion import get_opus_tempfile
     
@@ -360,7 +361,7 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
             else:
                 logger.debug("Converting %s to Opus format (bitrate: %d kbps, VBR: %s)", 
                             fname, bitrate, vbr)
-                handle, temp_file_path = get_opus_tempfile(ffmpeg_binary, opus_binary, fname, bitrate, vbr, keep_temp)
+                handle, temp_file_path = get_opus_tempfile(ffmpeg_binary, opus_binary, fname, bitrate, vbr, keep_temp, auto_download)
                 if temp_file_path:
                     temp_files.append(temp_file_path)
                     logger.debug("Temporary opus file saved to: %s", temp_file_path)

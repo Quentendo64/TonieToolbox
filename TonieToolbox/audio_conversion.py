@@ -12,7 +12,7 @@ from .logger import get_logger
 logger = get_logger('audio_conversion')
 
 
-def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitrate=48, vbr=True, keep_temp=False):
+def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitrate=48, vbr=True, keep_temp=False, auto_download=False):
     """
     Convert an audio file to Opus format and return a temporary file handle.
     
@@ -23,6 +23,7 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         bitrate: Bitrate for the Opus encoding in kbps
         vbr: Whether to use variable bitrate encoding
         keep_temp: Whether to keep the temporary files for testing
+        auto_download: Whether to automatically download dependencies if not found
         
     Returns:
         tuple: (file handle, temp_file_path) or (file handle, None) if keep_temp is False
@@ -31,18 +32,18 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
     
     if ffmpeg_binary is None:
         logger.debug("FFmpeg not specified, attempting to auto-detect")
-        ffmpeg_binary = get_ffmpeg_binary()
+        ffmpeg_binary = get_ffmpeg_binary(auto_download)
         if ffmpeg_binary is None:
-            logger.error("Could not find or download FFmpeg binary")
-            raise RuntimeError("Could not find or download FFmpeg binary")
+            logger.error("Could not find FFmpeg binary. Use --auto-download to enable automatic installation")
+            raise RuntimeError("Could not find FFmpeg binary. Use --auto-download to enable automatic installation")
         logger.debug("Found FFmpeg at: %s", ffmpeg_binary)
     
     if opus_binary is None:
         logger.debug("Opusenc not specified, attempting to auto-detect")
-        opus_binary = get_opus_binary()
+        opus_binary = get_opus_binary(auto_download)
         if opus_binary is None:
-            logger.error("Could not find or download Opus binary")
-            raise RuntimeError("Could not find or download Opus binary")
+            logger.error("Could not find Opus binary. Use --auto-download to enable automatic installation")
+            raise RuntimeError("Could not find Opus binary. Use --auto-download to enable automatic installation")
         logger.debug("Found opusenc at: %s", opus_binary)
     
     vbr_parameter = "--vbr" if vbr else "--hard-cbr"
