@@ -21,12 +21,12 @@ logger = get_logger('dependency_manager')
 DEPENDENCIES = {
     'ffmpeg': {
         'windows': {
-            'url': 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip',
+            'url': 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
             'bin_path': 'bin/ffmpeg.exe',
             'extract_dir': 'ffmpeg'
         },
         'linux': {
-            'url': 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-shared.tar.xz',
+            'url': 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz',
             'bin_path': 'ffmpeg',
             'extract_dir': 'ffmpeg'
         },
