@@ -13,10 +13,14 @@ import shutil
 import zipfile
 import tarfile
 import urllib.request
+import time
 from pathlib import Path
 
 from .logger import get_logger
 logger = get_logger('dependency_manager')
+
+CACHE_DIR = os.path.join(os.path.expanduser("~"), ".tonietoolbox")
+LIBS_DIR = os.path.join(CACHE_DIR, "libs")
 
 DEPENDENCIES = {
     'ffmpeg': {
@@ -59,16 +63,7 @@ def get_system():
 
 def get_user_data_dir():
     """Get the user data directory for storing downloaded dependencies."""
-    system = get_system()
-    
-    if system == 'windows':
-        base_dir = os.environ.get('APPDATA', os.path.expanduser('~'))
-    elif system == 'darwin':
-        base_dir = os.path.expanduser('~/Library/Application Support')
-    else:  # linux or other unix-like
-        base_dir = os.environ.get('XDG_DATA_HOME', os.path.expanduser('~/.local/share'))
-    
-    app_dir = os.path.join(base_dir, 'TonieToolbox')
+    app_dir = LIBS_DIR
     logger.debug("Using application data directory: %s", app_dir)
     
     os.makedirs(app_dir, exist_ok=True)
@@ -130,31 +125,121 @@ def extract_archive(archive_path, extract_dir):
         logger.info("Extracting %s to %s", archive_path, extract_dir)
         os.makedirs(extract_dir, exist_ok=True)
         
+        # Extract to a temporary subdirectory first
+        temp_extract_dir = os.path.join(extract_dir, "_temp_extract")
+        os.makedirs(temp_extract_dir, exist_ok=True)
+        
         if archive_path.endswith('.zip'):
             logger.debug("Extracting ZIP archive")
             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-                logger.trace("Extracted files: %s", zip_ref.namelist())
+                zip_ref.extractall(temp_extract_dir)
+                files_extracted = zip_ref.namelist()
+                logger.trace("Extracted files: %s", files_extracted)
         elif archive_path.endswith(('.tar.gz', '.tgz')):
             logger.debug("Extracting TAR.GZ archive")
             with tarfile.open(archive_path, 'r:gz') as tar_ref:
-                tar_ref.extractall(extract_dir)
-                logger.trace("Extracted files: %s", tar_ref.getnames())
+                tar_ref.extractall(temp_extract_dir)
+                files_extracted = tar_ref.getnames()
+                logger.trace("Extracted files: %s", files_extracted)
         elif archive_path.endswith(('.tar.xz', '.txz')):
             logger.debug("Extracting TAR.XZ archive")
             with tarfile.open(archive_path, 'r:xz') as tar_ref:
-                tar_ref.extractall(extract_dir)
-                logger.trace("Extracted files: %s", tar_ref.getnames())
+                tar_ref.extractall(temp_extract_dir)
+                files_extracted = tar_ref.getnames()
+                logger.trace("Extracted files: %s", files_extracted)
         elif archive_path.endswith('.tar'):
             logger.debug("Extracting TAR archive")
             with tarfile.open(archive_path, 'r') as tar_ref:
-                tar_ref.extractall(extract_dir)
-                logger.trace("Extracted files: %s", tar_ref.getnames())
+                tar_ref.extractall(temp_extract_dir)
+                files_extracted = tar_ref.getnames()
+                logger.trace("Extracted files: %s", files_extracted)
         else:
             logger.error("Unsupported archive format: %s", archive_path)
             return False
             
         logger.info("Archive extracted successfully")
+        
+        # Fix FFmpeg nested directory issue by moving binary files to the correct location
+        dependency_name = os.path.basename(extract_dir)
+        if dependency_name == 'ffmpeg':
+            # Check for common nested directory structures for FFmpeg
+            if os.path.exists(os.path.join(temp_extract_dir, "ffmpeg-master-latest-win64-gpl", "bin")):
+                # Windows FFmpeg path
+                bin_dir = os.path.join(temp_extract_dir, "ffmpeg-master-latest-win64-gpl", "bin")
+                logger.debug("Found nested FFmpeg bin directory: %s", bin_dir)
+                
+                # Move all files from bin directory to the main dependency directory
+                for file in os.listdir(bin_dir):
+                    src = os.path.join(bin_dir, file)
+                    dst = os.path.join(extract_dir, file)
+                    logger.debug("Moving %s to %s", src, dst)
+                    shutil.move(src, dst)
+            
+            elif os.path.exists(os.path.join(temp_extract_dir, "ffmpeg-master-latest-linux64-gpl", "bin")):
+                # Linux FFmpeg path
+                bin_dir = os.path.join(temp_extract_dir, "ffmpeg-master-latest-linux64-gpl", "bin")
+                logger.debug("Found nested FFmpeg bin directory: %s", bin_dir)
+                
+                # Move all files from bin directory to the main dependency directory
+                for file in os.listdir(bin_dir):
+                    src = os.path.join(bin_dir, file)
+                    dst = os.path.join(extract_dir, file)
+                    logger.debug("Moving %s to %s", src, dst)
+                    shutil.move(src, dst)
+            else:
+                # Check for any directory with a 'bin' subdirectory
+                for root, dirs, _ in os.walk(temp_extract_dir):
+                    if "bin" in dirs:
+                        bin_dir = os.path.join(root, "bin")
+                        logger.debug("Found nested bin directory: %s", bin_dir)
+                        
+                        # Move all files from bin directory to the main dependency directory
+                        for file in os.listdir(bin_dir):
+                            src = os.path.join(bin_dir, file)
+                            dst = os.path.join(extract_dir, file)
+                            logger.debug("Moving %s to %s", src, dst)
+                            shutil.move(src, dst)
+                        break
+                else:
+                    # If no bin directory was found, just move everything from the temp directory
+                    logger.debug("No bin directory found, moving all files from temp directory")
+                    for item in os.listdir(temp_extract_dir):
+                        src = os.path.join(temp_extract_dir, item)
+                        dst = os.path.join(extract_dir, item)
+                        if os.path.isfile(src):
+                            logger.debug("Moving file %s to %s", src, dst)
+                            shutil.move(src, dst)
+        else:
+            # For non-FFmpeg dependencies, just move all files from temp directory
+            for item in os.listdir(temp_extract_dir):
+                src = os.path.join(temp_extract_dir, item)
+                dst = os.path.join(extract_dir, item)
+                if os.path.isfile(src):
+                    logger.debug("Moving file %s to %s", src, dst)
+                    shutil.move(src, dst)
+                else:
+                    logger.debug("Moving directory %s to %s", src, dst)
+                    # If destination already exists, remove it first
+                    if os.path.exists(dst):
+                        shutil.rmtree(dst)
+                    shutil.move(src, dst)
+        
+        # Clean up the temporary extraction directory
+        try:
+            shutil.rmtree(temp_extract_dir)
+            logger.debug("Removed temporary extraction directory")
+        except Exception as e:
+            logger.warning("Failed to remove temporary extraction directory: %s", e)
+        
+        # Remove the archive file after successful extraction
+        try:
+            logger.debug("Removing archive file: %s", archive_path)
+            os.remove(archive_path)
+            logger.debug("Archive file removed successfully")
+        except Exception as e:
+            logger.warning("Failed to remove archive file: %s (error: %s)", archive_path, e)
+            # Continue even if we couldn't remove the file
+        
         return True
     except Exception as e:
         logger.error("Failed to extract %s: %s", archive_path, e)
@@ -302,73 +387,91 @@ def ensure_dependency(dependency_name, auto_download=False):
         logger.error("Unknown dependency: %s", dependency_name)
         return None
     
-    # First check if it's already in PATH
-    bin_name = dependency_name if dependency_name != 'opusenc' else 'opusenc'
-    path_binary = check_binary_in_path(bin_name)
-    if path_binary:
-        logger.info("Found %s in PATH: %s", dependency_name, path_binary)
-        return path_binary
-    
     # Set up paths to check for previously downloaded versions
     user_data_dir = get_user_data_dir()
     dependency_info = DEPENDENCIES[dependency_name].get(system, {})
-    extract_dir_name = dependency_info.get('extract_dir', dependency_name)
-    binary_path = dependency_info.get('bin_path', bin_name)
-    extract_dir = os.path.join(user_data_dir, extract_dir_name)
+    binary_path = dependency_info.get('bin_path', dependency_name if dependency_name != 'opusenc' else 'opusenc')
     
-    # Check if we already downloaded and extracted it previously
-    logger.debug("Checking for previously downloaded %s in %s", dependency_name, extract_dir)
-    if os.path.exists(extract_dir):
-        existing_binary = find_binary_in_extracted_dir(extract_dir, binary_path)
-        if existing_binary and os.path.exists(existing_binary):
-            # Verify that the binary works
-            logger.info("Found previously downloaded %s: %s", dependency_name, existing_binary)
-            try:
-                if os.access(existing_binary, os.X_OK) or system == 'windows':
-                    if system in ['linux', 'darwin']:
-                        logger.debug("Ensuring executable permissions on %s", existing_binary)
-                        os.chmod(existing_binary, 0o755)
-                    
-                    # Quick check to verify binary works
-                    if dependency_name == 'opusenc':
-                        cmd = [existing_binary, '--version']
-                        try:
-                            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
-                            if result.returncode == 0:
-                                logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
-                                return existing_binary
-                        except:
-                            # If --version fails, try without arguments
+    # Create a specific folder for this dependency
+    dependency_dir = os.path.join(user_data_dir, dependency_name)
+    
+    # First priority: Check if we already downloaded and extracted it previously
+    # When auto_download is True, we'll skip this check and download fresh versions
+    if not auto_download:
+        logger.debug("Checking for previously downloaded %s in %s", dependency_name, dependency_dir)
+        if os.path.exists(dependency_dir):
+            existing_binary = find_binary_in_extracted_dir(dependency_dir, binary_path)
+            if existing_binary and os.path.exists(existing_binary):
+                # Verify that the binary works
+                logger.info("Found previously downloaded %s: %s", dependency_name, existing_binary)
+                try:
+                    if os.access(existing_binary, os.X_OK) or system == 'windows':
+                        if system in ['linux', 'darwin']:
+                            logger.debug("Ensuring executable permissions on %s", existing_binary)
+                            os.chmod(existing_binary, 0o755)
+                        
+                        # Quick check to verify binary works
+                        if dependency_name == 'opusenc':
+                            cmd = [existing_binary, '--version']
                             try:
-                                result = subprocess.run([existing_binary], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                                if result.returncode == 0:
+                                    logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                    return existing_binary
+                            except:
+                                # If --version fails, try without arguments
+                                try:
+                                    result = subprocess.run([existing_binary], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                                    if result.returncode == 0:
+                                        logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                        return existing_binary
+                                except:
+                                    pass
+                        else:
+                            cmd = [existing_binary, '-version']
+                            try:
+                                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                                 if result.returncode == 0:
                                     logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
                                     return existing_binary
                             except:
                                 pass
-                    else:
-                        cmd = [existing_binary, '-version']
-                        try:
-                            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
-                            if result.returncode == 0:
-                                logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
-                                return existing_binary
-                        except:
-                            pass
-                            
-                    logger.warning("Previously downloaded %s exists but failed verification", dependency_name)
+                                
+                        logger.warning("Previously downloaded %s exists but failed verification", dependency_name)
+                except Exception as e:
+                    logger.warning("Error verifying downloaded binary: %s", e)
+
+        # Second priority: Check if it's in PATH (only if auto_download is False)
+        bin_name = dependency_name if dependency_name != 'opusenc' else 'opusenc'
+        path_binary = check_binary_in_path(bin_name)
+        if path_binary:
+            logger.info("Found %s in PATH: %s", dependency_name, path_binary)
+            return path_binary
+    else:
+        logger.info("Auto-download enabled, forcing download/installation of %s", dependency_name)
+        # If there's an existing download directory, rename or remove it
+        if os.path.exists(dependency_dir):
+            try:
+                backup_dir = f"{dependency_dir}_backup_{int(time.time())}"
+                logger.debug("Moving existing dependency directory to: %s", backup_dir)
+                os.rename(dependency_dir, backup_dir)
             except Exception as e:
-                logger.warning("Error verifying downloaded binary: %s", e)
+                logger.warning("Failed to rename existing dependency directory: %s", e)
+                try:
+                    logger.debug("Trying to remove existing dependency directory")
+                    shutil.rmtree(dependency_dir, ignore_errors=True)
+                except Exception as e:
+                    logger.warning("Failed to remove existing dependency directory: %s", e)
     
     # If auto_download is not enabled, don't try to install or download
     if not auto_download:
-        logger.warning("%s not found in PATH and auto-download is disabled. Use --auto-download to enable automatic installation.", dependency_name)
+        logger.warning("%s not found in libs directory or PATH and auto-download is disabled. Use --auto-download to enable automatic installation.", dependency_name)
         return None
         
-    # If not in PATH, check if we should install via package manager
+    # If not in libs or PATH, check if we should install via package manager
     if 'package' in dependency_info:
         package_name = dependency_info['package']
-        logger.info("%s not found. Attempting to install %s package...", dependency_name, package_name)
+        logger.info("%s not found or forced download. Attempting to install %s package...", dependency_name, package_name)
         if install_package(package_name):
             path_binary = check_binary_in_path(bin_name)
             if path_binary:
@@ -382,16 +485,18 @@ def ensure_dependency(dependency_name, auto_download=False):
     
     # Set up download paths
     download_url = dependency_info['url']
-    os.makedirs(extract_dir, exist_ok=True)
+    
+    # Create dependency-specific directory
+    os.makedirs(dependency_dir, exist_ok=True)
     
     # Download and extract
     archive_ext = '.zip' if download_url.endswith('zip') else '.tar.xz'
-    archive_path = os.path.join(user_data_dir, f"{dependency_name}{archive_ext}")
+    archive_path = os.path.join(dependency_dir, f"{dependency_name}{archive_ext}")
     logger.debug("Using archive path: %s", archive_path)
     
     if download_file(download_url, archive_path):
-        if extract_archive(archive_path, extract_dir):
-            binary = find_binary_in_extracted_dir(extract_dir, binary_path)
+        if extract_archive(archive_path, dependency_dir):
+            binary = find_binary_in_extracted_dir(dependency_dir, binary_path)
             if binary:
                 # Make sure it's executable on Unix-like systems
                 if system in ['linux', 'darwin']:
