@@ -89,10 +89,13 @@ def main():
     # Check for updates
     if not args.skip_update_check:
         logger.debug("Checking for updates (force_refresh=%s)", args.force_refresh_cache)
-        check_for_updates(
+        is_latest, latest_version, message, update_confirmed = check_for_updates(
             quiet=args.silent or args.quiet,
             force_refresh=args.force_refresh_cache
         )
+        
+        if not is_latest and not update_confirmed and not (args.silent or args.quiet):
+            logger.info("Update available but user chose to continue without updating.")
 
     ffmpeg_binary = args.ffmpeg
     if ffmpeg_binary is None:

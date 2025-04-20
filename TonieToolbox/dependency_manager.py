@@ -309,14 +309,65 @@ def ensure_dependency(dependency_name, auto_download=False):
         logger.info("Found %s in PATH: %s", dependency_name, path_binary)
         return path_binary
     
+    # Set up paths to check for previously downloaded versions
+    user_data_dir = get_user_data_dir()
+    dependency_info = DEPENDENCIES[dependency_name].get(system, {})
+    extract_dir_name = dependency_info.get('extract_dir', dependency_name)
+    binary_path = dependency_info.get('bin_path', bin_name)
+    extract_dir = os.path.join(user_data_dir, extract_dir_name)
+    
+    # Check if we already downloaded and extracted it previously
+    logger.debug("Checking for previously downloaded %s in %s", dependency_name, extract_dir)
+    if os.path.exists(extract_dir):
+        existing_binary = find_binary_in_extracted_dir(extract_dir, binary_path)
+        if existing_binary and os.path.exists(existing_binary):
+            # Verify that the binary works
+            logger.info("Found previously downloaded %s: %s", dependency_name, existing_binary)
+            try:
+                if os.access(existing_binary, os.X_OK) or system == 'windows':
+                    if system in ['linux', 'darwin']:
+                        logger.debug("Ensuring executable permissions on %s", existing_binary)
+                        os.chmod(existing_binary, 0o755)
+                    
+                    # Quick check to verify binary works
+                    if dependency_name == 'opusenc':
+                        cmd = [existing_binary, '--version']
+                        try:
+                            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                            if result.returncode == 0:
+                                logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                return existing_binary
+                        except:
+                            # If --version fails, try without arguments
+                            try:
+                                result = subprocess.run([existing_binary], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                                if result.returncode == 0:
+                                    logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                    return existing_binary
+                            except:
+                                pass
+                    else:
+                        cmd = [existing_binary, '-version']
+                        try:
+                            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                            if result.returncode == 0:
+                                logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                return existing_binary
+                        except:
+                            pass
+                            
+                    logger.warning("Previously downloaded %s exists but failed verification", dependency_name)
+            except Exception as e:
+                logger.warning("Error verifying downloaded binary: %s", e)
+    
     # If auto_download is not enabled, don't try to install or download
     if not auto_download:
         logger.warning("%s not found in PATH and auto-download is disabled. Use --auto-download to enable automatic installation.", dependency_name)
         return None
         
     # If not in PATH, check if we should install via package manager
-    if 'package' in DEPENDENCIES[dependency_name].get(system, {}):
-        package_name = DEPENDENCIES[dependency_name][system]['package']
+    if 'package' in dependency_info:
+        package_name = dependency_info['package']
         logger.info("%s not found. Attempting to install %s package...", dependency_name, package_name)
         if install_package(package_name):
             path_binary = check_binary_in_path(bin_name)
@@ -325,26 +376,13 @@ def ensure_dependency(dependency_name, auto_download=False):
                 return path_binary
     
     # If not installable via package manager or installation failed, try downloading
-    if 'url' not in DEPENDENCIES[dependency_name].get(system, {}):
+    if 'url' not in dependency_info:
         logger.error("Cannot download %s for %s", dependency_name, system)
         return None
     
-    # Set up paths
-    user_data_dir = get_user_data_dir()
-    dependency_info = DEPENDENCIES[dependency_name][system]
+    # Set up download paths
     download_url = dependency_info['url']
-    extract_dir_name = dependency_info['extract_dir']
-    binary_path = dependency_info['bin_path']
-    
-    extract_dir = os.path.join(user_data_dir, extract_dir_name)
-    logger.debug("Using extract directory: %s", extract_dir)
     os.makedirs(extract_dir, exist_ok=True)
-    
-    # Check if we already downloaded and extracted it
-    existing_binary = find_binary_in_extracted_dir(extract_dir, binary_path)
-    if existing_binary and os.path.exists(existing_binary):
-        logger.info("Using existing %s: %s", dependency_name, existing_binary)
-        return existing_binary
     
     # Download and extract
     archive_ext = '.zip' if download_url.endswith('zip') else '.tar.xz'

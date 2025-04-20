@@ -134,24 +134,27 @@ def check_for_updates(quiet=False, force_refresh=False):
     Check if the current version of TonieToolbox is the latest.
     
     Args:
-        quiet: If True, will not log any information messages
+        quiet: If True, will not log any information messages and skip user confirmation
         force_refresh: If True, bypass cache and check PyPI directly
         
     Returns:
-        tuple: (is_latest, latest_version, message)
+        tuple: (is_latest, latest_version, message, update_confirmed)
             is_latest: boolean indicating if the current version is the latest
             latest_version: string with the latest version
             message: string message about the update status or error
+            update_confirmed: boolean indicating if the user confirmed the update
     """
     logger = get_logger("version_handler")
     current_version = __version__
+    update_confirmed = False
     
-    logger.debug("Starting update check (quiet=%s, force_refresh=%s)", quiet, force_refresh)
+    logger.debug("Starting update check (quiet=%s, force_refresh=%s)", 
+                quiet, force_refresh)
     latest_version, error = get_pypi_version(force_refresh)
     
     if error:
         logger.debug("Error occurred during update check: %s", error)
-        return True, current_version, error
+        return True, current_version, error, update_confirmed
         
     compare_result = compare_versions(current_version, latest_version)
     is_latest = compare_result >= 0  # current >= latest
@@ -166,9 +169,69 @@ def check_for_updates(quiet=False, force_refresh=False):
         message = f"Update available! Current version: {current_version}, Latest version: {latest_version}"
         if not quiet:
             logger.info(message)
-            logger.info("Consider upgrading with: pip install --upgrade TonieToolbox")
+            
+            # Show confirmation prompt if not in quiet mode
+            try:
+                response = input(f"Do you want to upgrade to TonieToolbox {latest_version}? [y/N]: ").lower().strip()
+                update_confirmed = response == 'y' or response == 'yes'
+                
+                if update_confirmed:
+                    logger.info("Update confirmed. Attempting to install update...")
+                    if install_update():
+                        logger.info(f"Successfully updated to TonieToolbox {latest_version}")
+                        import sys
+                        logger.info("Exiting program. Please restart TonieToolbox to use the new version.")
+                        sys.exit(0)
+                    else:
+                        logger.error("Failed to install update automatically")
+                        logger.error("Please update manually using: pip install --upgrade TonieToolbox")
+                        import sys
+                        sys.exit(1)
+                else:
+                    logger.info("Update skipped by user.")
+            except (EOFError, KeyboardInterrupt):
+                logger.debug("User input interrupted")
+                update_confirmed = False
     
-    return is_latest, latest_version, message
+    return is_latest, latest_version, message, update_confirmed
+
+
+def install_update():
+    """
+    Try to install the update using pip, pip3, or pipx.
+    
+    Returns:
+        bool: True if the update was successfully installed, False otherwise
+    """
+    logger = get_logger("version_handler")
+    import subprocess
+    import sys
+    
+    package_name = "TonieToolbox"
+    commands = [
+        [sys.executable, "-m", "pip", "install", "--upgrade", package_name],
+        ["pip", "install", "--upgrade", package_name],
+        ["pip3", "install", "--upgrade", package_name],
+        ["pipx", "upgrade", package_name]
+    ]
+    
+    for cmd in commands:
+        try:
+            logger.info(f"Attempting to install update using: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            
+            if result.returncode == 0:
+                logger.debug("Update command succeeded")
+                logger.debug(f"Output: {result.stdout}")
+                return True
+            else:
+                logger.debug(f"Command failed with returncode {result.returncode}")
+                logger.debug(f"stdout: {result.stdout}")
+                logger.debug(f"stderr: {result.stderr}")
+        except Exception as e:
+            logger.debug(f"Exception while running {cmd[0]}: {str(e)}")
+    
+    return False
 
 
 def clear_version_cache():

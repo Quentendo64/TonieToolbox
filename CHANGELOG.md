@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recursive Folder Processing
 - Upload to TeddyCloud Library
 - Download-option with rip
+## [0.1.7] - 2025-04-20
+### Added
+- version handler try to install updates automatically after user confirmation
+### Fixed
+- dependency manager checks previous downloaded versions now
+### Changed
+- version handler need user confirmation when update is available
 ## [0.1.6] - 2025-04-20
 ### Fixed
 - Version Handler and cache invalidation
