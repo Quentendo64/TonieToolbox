@@ -21,50 +21,50 @@ from .recursive_processor import process_recursive_folders
 def main():
     """Entry point for the TonieToolbox application."""
     parser = argparse.ArgumentParser(description='Create Tonie compatible file from Ogg opus file(s).')
-    parser.add_argument('--version', action='version', version=f'TonieToolbox {__version__}',
+    parser.add_argument('-v', '--version', action='version', version=f'TonieToolbox {__version__}',
                         help='show program version and exit')
     parser.add_argument('input_filename', metavar='SOURCE', type=str, 
                         help='input file or directory or a file list (.lst)')
     parser.add_argument('output_filename', metavar='TARGET', nargs='?', type=str,
                         help='the output file name (default: ---ID---)')
-    parser.add_argument('--ts', dest='user_timestamp', metavar='TIMESTAMP', action='store',
+    parser.add_argument('-t', '--timestamp', dest='user_timestamp', metavar='TIMESTAMP', action='store',
                         help='set custom timestamp / bitstream serial')
 
-    parser.add_argument('--ffmpeg', help='specify location of ffmpeg', default=None)
-    parser.add_argument('--opusenc', help='specify location of opusenc', default=None)
-    parser.add_argument('--bitrate', type=int, help='set encoding bitrate in kbps (default: 96)', default=96)
-    parser.add_argument('--cbr', action='store_true', help='encode in cbr mode')
-    parser.add_argument('--append-tonie-tag', metavar='TAG', action='store',
+    parser.add_argument('-f', '--ffmpeg', help='specify location of ffmpeg', default=None)
+    parser.add_argument('-o', '--opusenc', help='specify location of opusenc', default=None)
+    parser.add_argument('-b', '--bitrate', type=int, help='set encoding bitrate in kbps (default: 96)', default=96)
+    parser.add_argument('-c', '--cbr', action='store_true', help='encode in cbr mode')
+    parser.add_argument('-a', '--append-tonie-tag', metavar='TAG', action='store',
                         help='append [TAG] to filename (must be an 8-character hex value)')
-    parser.add_argument('--no-tonie-header', action='store_true', help='do not write Tonie header')
-    parser.add_argument('--info', action='store_true', help='Check and display info about Tonie file')
-    parser.add_argument('--split', action='store_true', help='Split Tonie file into opus tracks')
-    parser.add_argument('--recursive', action='store_true', help='Process folders recursively')
-    parser.add_argument('--output-to-source', action='store_true', 
+    parser.add_argument('-n', '--no-tonie-header', action='store_true', help='do not write Tonie header')
+    parser.add_argument('-i', '--info', action='store_true', help='Check and display info about Tonie file')
+    parser.add_argument('-s', '--split', action='store_true', help='Split Tonie file into opus tracks')
+    parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
+    parser.add_argument('-O', '--output-to-source', action='store_true', 
                         help='Save output files in the source directory instead of output directory')
-    parser.add_argument('--auto-download', action='store_true', help='Automatically download FFmpeg and opusenc if needed')
-    parser.add_argument('--keep-temp', action='store_true', 
+    parser.add_argument('-A', '--auto-download', action='store_true', help='Automatically download FFmpeg and opusenc if needed')
+    parser.add_argument('-k', '--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
-    parser.add_argument('--compare', action='store', metavar='FILE2', 
+    parser.add_argument('-C', '--compare', action='store', metavar='FILE2', 
                        help='Compare input file with another .taf file for debugging')
-    parser.add_argument('--detailed-compare', action='store_true',
+    parser.add_argument('-D', '--detailed-compare', action='store_true',
                        help='Show detailed OGG page differences when comparing files')
     
     # Version check options
     version_group = parser.add_argument_group('Version Check Options')
-    version_group.add_argument('--skip-update-check', action='store_true',
+    version_group.add_argument('-S', '--skip-update-check', action='store_true',
                        help='Skip checking for updates')
-    version_group.add_argument('--force-refresh-cache', action='store_true',
+    version_group.add_argument('-F', '--force-refresh-cache', action='store_true',
                        help='Force refresh of update information from PyPI')
-    version_group.add_argument('--clear-version-cache', action='store_true',
+    version_group.add_argument('-X', '--clear-version-cache', action='store_true',
                        help='Clear cached version information')
     
     log_group = parser.add_argument_group('Logging Options')
     log_level_group = log_group.add_mutually_exclusive_group()
-    log_level_group.add_argument('--debug', action='store_true', help='Enable debug logging')
-    log_level_group.add_argument('--trace', action='store_true', help='Enable trace logging (very verbose)')
-    log_level_group.add_argument('--quiet', action='store_true', help='Show only warnings and errors')
-    log_level_group.add_argument('--silent', action='store_true', help='Show only errors')
+    log_level_group.add_argument('-d', '--debug', action='store_true', help='Enable debug logging')
+    log_level_group.add_argument('-T', '--trace', action='store_true', help='Enable trace logging (very verbose)')
+    log_level_group.add_argument('-q', '--quiet', action='store_true', help='Show only warnings and errors')
+    log_level_group.add_argument('-Q', '--silent', action='store_true', help='Show only errors')
 
     args = parser.parse_args()
     if args.trace:

@@ -132,15 +132,14 @@ tonietoolbox --recursive --output-to-source "Music/Albums"
 Run the following command to see all available options:
 
 ```
-tonietoolbox --help
+tonietoolbox -h
 ```
 
 Output:
 ```
-usage: TonieToolbox.py [-h] [--ts TIMESTAMP] [--ffmpeg FFMPEG] [--opusenc OPUSENC] 
-                    [--bitrate BITRATE] [--cbr] [--append-tonie-tag TAG] 
-                    [--no-tonie-header] [--info] [--split] [--recursive] [--output-to-source]
-                    [--compare FILE2] [--detailed-compare] [--debug] [--trace] [--quiet] [--silent]
+usage: TonieToolbox.py [-h] [-v] [-t TIMESTAMP] [-f FFMPEG] [-o OPUSENC] 
+                    [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
+                    [-A] [-k] [-C FILE2] [-D] [-d] [-T] [-q] [-Q]
                     SOURCE [TARGET]
 
 Create Tonie compatible file from Ogg opus file(s).
@@ -151,25 +150,40 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --ts TIMESTAMP        set custom timestamp / bitstream serial / reference .taf file
-  --ffmpeg FFMPEG       specify location of ffmpeg
-  --opusenc OPUSENC     specify location of opusenc
-  --bitrate BITRATE     set encoding bitrate in kbps (default: 96)
-  --cbr                 encode in cbr mode
-  --append-tonie-tag TAG append [TAG] to filename (must be an 8-character hex value)
-  --no-tonie-header     do not write Tonie header
-  --info                Check and display info about Tonie file
-  --split               Split Tonie file into opus tracks
-  --recursive           Process folders recursively
-  --output-to-source    Save output files in the source directory instead of output directory
-  --compare FILE2       Compare input file with another .taf file for debugging
-  --detailed-compare    Show detailed OGG page differences when comparing files
+  -v, --version         show program version and exit
+  -t, --timestamp TIMESTAMP
+                        set custom timestamp / bitstream serial / reference .taf file
+  -f, --ffmpeg FFMPEG   specify location of ffmpeg
+  -o, --opusenc OPUSENC specify location of opusenc
+  -b, --bitrate BITRATE set encoding bitrate in kbps (default: 96)
+  -c, --cbr             encode in cbr mode
+  -a, --append-tonie-tag TAG
+                        append [TAG] to filename (must be an 8-character hex value)
+  -n, --no-tonie-header do not write Tonie header
+  -i, --info            Check and display info about Tonie file
+  -s, --split           Split Tonie file into opus tracks
+  -r, --recursive       Process folders recursively
+  -O, --output-to-source
+                        Save output files in the source directory instead of output directory
+  -A, --auto-download   Automatically download FFmpeg and opusenc if needed
+  -k, --keep-temp       Keep temporary opus files in a temp folder for testing
+  -C, --compare FILE2   Compare input file with another .taf file for debugging
+  -D, --detailed-compare
+                        Show detailed OGG page differences when comparing files
+
+Version Check Options:
+  -S, --skip-update-check
+                        Skip checking for updates
+  -F, --force-refresh-cache
+                        Force refresh of update information from PyPI
+  -X, --clear-version-cache
+                        Clear cached version information
 
 Logging Options:
-  --debug               Enable debug logging
-  --trace               Enable trace logging (very verbose)
-  --quiet               Show only warnings and errors
-  --silent              Show only errors
+  -d, --debug           Enable debug logging
+  -T, --trace           Enable trace logging (very verbose)
+  -q, --quiet           Show only warnings and errors
+  -Q, --silent          Show only errors
 ```
 
 ### Common Usage Examples
@@ -203,9 +217,9 @@ tonietoolbox file1.taf --compare file2.taf --detailed-compare
 #### Custom timestamp options:
 
 ```
-tonietoolbox input.mp3 --ts 1745078762  # UNIX Timestamp
-tonietoolbox input.mp3 --ts 0x6803C9EA  # Bitstream time
-tonietoolbox input.mp3 --ts ./reference.taf  # Reference TAF for extraction
+tonietoolbox input.mp3 --timestamp 1745078762  # UNIX Timestamp
+tonietoolbox input.mp3 --timestamp 0x6803C9EA  # Bitstream time
+tonietoolbox input.mp3 --timestamp ./reference.taf  # Reference TAF for extraction
 ```
 
 #### Set custom bitrate:

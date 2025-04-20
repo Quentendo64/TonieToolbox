@@ -6,10 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Recursive Folder Processing
 - Upload to TeddyCloud Library
 - Download-option with rip
 
+## [0.2.0] - 2025-04-20
+### Added
+- short versions (aliases) for all the command-line arguments
 ## [0.2.0] - 2025-04-20
 ### Added
 - Recursive Folder Processing - Using --recursive | --recursive --output-to-source
