@@ -392,6 +392,9 @@ def ensure_dependency(dependency_name, auto_download=False):
     dependency_info = DEPENDENCIES[dependency_name].get(system, {})
     binary_path = dependency_info.get('bin_path', dependency_name if dependency_name != 'opusenc' else 'opusenc')
     
+    # Define bin_name early so it's available in all code paths
+    bin_name = dependency_name if dependency_name != 'opusenc' else 'opusenc'
+    
     # Create a specific folder for this dependency
     dependency_dir = os.path.join(user_data_dir, dependency_name)
     
@@ -442,7 +445,6 @@ def ensure_dependency(dependency_name, auto_download=False):
                     logger.warning("Error verifying downloaded binary: %s", e)
 
         # Second priority: Check if it's in PATH (only if auto_download is False)
-        bin_name = dependency_name if dependency_name != 'opusenc' else 'opusenc'
         path_binary = check_binary_in_path(bin_name)
         if path_binary:
             logger.info("Found %s in PATH: %s", dependency_name, path_binary)

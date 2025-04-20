@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recursive Folder Processing
 - Upload to TeddyCloud Library
 - Download-option with rip
+
+## [0.2.0] - 2025-04-20
+### Added
+- Recursive Folder Processing - Using --recursive | --recursive --output-to-source
+### Fixed
+- dependency manager: Using opusenc after apt install
+- .lst encoding problem
 ## [0.1.8] - 2025-04-20
 ### Changed
 - consolidate all tonietoolbox files to ~/.tonietoolbox

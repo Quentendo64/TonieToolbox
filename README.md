@@ -35,6 +35,7 @@ TonieToolbox allows you to create custom audio content for Tonie boxes by conver
 The tool provides several capabilities:
 
 - Convert single or multiple audio files into a Tonie-compatible format
+- Process complex folder structures recursively to handle entire audio collections
 - Analyze and validate existing Tonie files
 - Split Tonie files into individual opus tracks
 - Compare two TAF files for debugging differences
@@ -110,6 +111,22 @@ Or use a list file (.lst) containing paths to multiple audio files:
 tonietoolbox playlist.lst
 ```
 
+**Process folders recursively:**
+
+To process an entire folder structure with multiple audio folders:
+
+```
+tonietoolbox --recursive "Music/Albums"
+```
+
+This will scan all subfolders, identify those containing audio files, and create a TAF file for each folder.
+
+By default, all generated TAF files are saved in the `.\output` directory. If you want to save each TAF file in its source directory instead:
+
+```
+tonietoolbox --recursive --output-to-source "Music/Albums"
+```
+
 ### Advanced Options
 
 Run the following command to see all available options:
@@ -122,8 +139,8 @@ Output:
 ```
 usage: TonieToolbox.py [-h] [--ts TIMESTAMP] [--ffmpeg FFMPEG] [--opusenc OPUSENC] 
                     [--bitrate BITRATE] [--cbr] [--append-tonie-tag TAG] 
-                    [--no-tonie-header] [--info] [--split] [--recursive] [--compare FILE2]
-                    [--detailed-compare] [--debug] [--trace] [--quiet] [--silent]
+                    [--no-tonie-header] [--info] [--split] [--recursive] [--output-to-source]
+                    [--compare FILE2] [--detailed-compare] [--debug] [--trace] [--quiet] [--silent]
                     SOURCE [TARGET]
 
 Create Tonie compatible file from Ogg opus file(s).
@@ -143,6 +160,8 @@ optional arguments:
   --no-tonie-header     do not write Tonie header
   --info                Check and display info about Tonie file
   --split               Split Tonie file into opus tracks
+  --recursive           Process folders recursively
+  --output-to-source    Save output files in the source directory instead of output directory
   --compare FILE2       Compare input file with another .taf file for debugging
   --detailed-compare    Show detailed OGG page differences when comparing files
 
@@ -193,6 +212,20 @@ tonietoolbox input.mp3 --ts ./reference.taf  # Reference TAF for extraction
 
 ```
 tonietoolbox input.mp3 --bitrate 128
+```
+
+#### Process a complex folder structure:
+
+Process an audiobook series with multiple folders:
+
+```
+tonietoolbox --recursive "\Hörspiele\Die drei Fragezeichen\Folgen"
+```
+
+Process a music collection with nested album folders and save TAF files alongside the source directories:
+
+```
+tonietoolbox --recursive --output-to-source "\Hörspiele\"
 ```
 
 ## Technical Details

@@ -16,6 +16,7 @@ from .dependency_manager import get_ffmpeg_binary, get_opus_binary
 from .logger import setup_logging, get_logger
 from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
+from .recursive_processor import process_recursive_folders
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -38,6 +39,9 @@ def main():
     parser.add_argument('--no-tonie-header', action='store_true', help='do not write Tonie header')
     parser.add_argument('--info', action='store_true', help='Check and display info about Tonie file')
     parser.add_argument('--split', action='store_true', help='Split Tonie file into opus tracks')
+    parser.add_argument('--recursive', action='store_true', help='Process folders recursively')
+    parser.add_argument('--output-to-source', action='store_true', 
+                        help='Save output files in the source directory instead of output directory')
     parser.add_argument('--auto-download', action='store_true', help='Automatically download FFmpeg and opusenc if needed')
     parser.add_argument('--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
@@ -113,6 +117,39 @@ def main():
             sys.exit(1)
         logger.debug("Using opusenc binary: %s", opus_binary)
 
+    # Handle recursive processing
+    if args.recursive:
+        logger.info("Processing folders recursively: %s", args.input_filename)
+        process_tasks = process_recursive_folders(args.input_filename)
+        
+        if not process_tasks:
+            logger.error("No folders with audio files found for recursive processing")
+            sys.exit(1)
+            
+        output_dir = None if args.output_to_source else './output'
+        
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            logger.debug("Created output directory: %s", output_dir)
+        
+        for task_index, (output_name, folder_path, audio_files) in enumerate(process_tasks):
+            if args.output_to_source:
+                task_out_filename = os.path.join(folder_path, f"{output_name}.taf")
+            else:
+                task_out_filename = os.path.join(output_dir, f"{output_name}.taf")
+                
+            logger.info("[%d/%d] Processing folder: %s -> %s", 
+                      task_index + 1, len(process_tasks), folder_path, task_out_filename)
+            
+            create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
+                           args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
+                           args.auto_download)
+            logger.info("Successfully created Tonie file: %s", task_out_filename)
+            
+        logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
+        sys.exit(0)
+
+    # Handle directory or file input
     if os.path.isdir(args.input_filename):
         logger.debug("Input is a directory: %s", args.input_filename)
         args.input_filename += "/*"
@@ -143,12 +180,17 @@ def main():
         out_filename = args.output_filename
     else:
         guessed_name = guess_output_filename(args.input_filename, files)    
-        output_dir = './output'
-        if not os.path.exists(output_dir):
-            logger.debug("Creating default output directory: %s", output_dir)
-            os.makedirs(output_dir, exist_ok=True)
-        out_filename = os.path.join(output_dir, guessed_name)
-        logger.debug("Using default output location: %s", out_filename)
+        if args.output_to_source:
+            source_dir = os.path.dirname(files[0]) if files else '.'
+            out_filename = os.path.join(source_dir, guessed_name)
+            logger.debug("Using source location for output: %s", out_filename)
+        else:
+            output_dir = './output'
+            if not os.path.exists(output_dir):
+                logger.debug("Creating default output directory: %s", output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+            out_filename = os.path.join(output_dir, guessed_name)
+            logger.debug("Using default output location: %s", out_filename)
 
     if args.append_tonie_tag:
         logger.debug("Appending Tonie tag to output filename")
@@ -162,7 +204,7 @@ def main():
     
     if not out_filename.lower().endswith('.taf'):
         out_filename += '.taf'
-
+    
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
                      args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, args.auto_download)

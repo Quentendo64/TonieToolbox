@@ -58,37 +58,65 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         logger.info("Creating persistent temporary file: %s", temp_path)
         
         logger.debug("Starting FFmpeg process")
-        ffmpeg_process = subprocess.Popen(
-            [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
-             "-ar", "48000", "-"], stdout=subprocess.PIPE)
+        try:
+            ffmpeg_process = subprocess.Popen(
+                [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
+                 "-ar", "48000", "-"], stdout=subprocess.PIPE)
+        except FileNotFoundError:
+            logger.error("Error opening input file %s", filename)
+            raise RuntimeError(f"Error opening input file {filename}")
              
         logger.debug("Starting opusenc process")
-        opusenc_process = subprocess.Popen(
-            [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", temp_path],
-            stdin=ffmpeg_process.stdout, stderr=subprocess.DEVNULL)
+        try:
+            opusenc_process = subprocess.Popen(
+                [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", temp_path],
+                stdin=ffmpeg_process.stdout, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            logger.error("Opus encoding failed: %s", str(e))
+            raise RuntimeError(f"Opus encoding failed: {str(e)}")
         
-        opusenc_process.communicate()
+        ffmpeg_process.stdout.close()  # Allow ffmpeg to receive SIGPIPE if opusenc exits
+        opusenc_return = opusenc_process.wait()
+        ffmpeg_return = ffmpeg_process.wait()
         
-        if opusenc_process.returncode != 0:
-            logger.error("Opus encoding failed with return code %d", opusenc_process.returncode)
-            raise RuntimeError(f"Opus encoding failed with return code {opusenc_process.returncode}")
+        if ffmpeg_return != 0:
+            logger.error("FFmpeg processing failed with return code %d", ffmpeg_return)
+            raise RuntimeError(f"FFmpeg processing failed with return code {ffmpeg_return}")
+        
+        if opusenc_return != 0:
+            logger.error("Opus encoding failed with return code %d", opusenc_return)
+            raise RuntimeError(f"Opus encoding failed with return code {opusenc_return}")
         
         logger.debug("Opening temporary file for reading")
-        tmp_file = open(temp_path, "rb")
-        return tmp_file, temp_path
+        try:
+            tmp_file = open(temp_path, "rb")
+            return tmp_file, temp_path
+        except Exception as e:
+            logger.error("Failed to open temporary file: %s", str(e))
+            raise RuntimeError(f"Failed to open temporary file: {str(e)}")
     else:        
         logger.debug("Using in-memory temporary file")
         
         logger.debug("Starting FFmpeg process")
-        ffmpeg_process = subprocess.Popen(
-            [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
-             "-ar", "48000", "-"], stdout=subprocess.PIPE)
+        try:
+            ffmpeg_process = subprocess.Popen(
+                [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
+                 "-ar", "48000", "-"], stdout=subprocess.PIPE)
+        except FileNotFoundError:
+            logger.error("Error opening input file %s", filename)
+            raise RuntimeError(f"Error opening input file {filename}")
              
         logger.debug("Starting opusenc process")
-        opusenc_process = subprocess.Popen(
-            [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", "-"],
-            stdin=ffmpeg_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            opusenc_process = subprocess.Popen(
+                [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", "-"],
+                stdin=ffmpeg_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            logger.error("Opus encoding failed: %s", str(e))
+            raise RuntimeError(f"Opus encoding failed: {str(e)}")
 
+        ffmpeg_process.stdout.close()  # Allow ffmpeg to receive SIGPIPE if opusenc exits
+        
         tmp_file = tempfile.SpooledTemporaryFile()
         bytes_written = 0
         
@@ -97,9 +125,16 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
             tmp_file.write(chunk)
             bytes_written += len(chunk)
         
-        if opusenc_process.wait() != 0:
-            logger.error("Opus encoding failed with return code %d", opusenc_process.returncode)
-            raise RuntimeError(f"Opus encoding failed with return code {opusenc_process.returncode}")
+        opusenc_return = opusenc_process.wait()
+        ffmpeg_return = ffmpeg_process.wait()
+        
+        if ffmpeg_return != 0:
+            logger.error("FFmpeg processing failed with return code %d", ffmpeg_return)
+            raise RuntimeError(f"FFmpeg processing failed with return code {ffmpeg_return}")
+        
+        if opusenc_return != 0:
+            logger.error("Opus encoding failed with return code %d", opusenc_return)
+            raise RuntimeError(f"Opus encoding failed with return code {opusenc_return}")
         
         logger.debug("Wrote %d bytes to temporary file", bytes_written)
         tmp_file.seek(0)
@@ -157,12 +192,38 @@ def get_input_files(input_filename):
         logger.debug("Processing list file: %s", input_filename)
         list_dir = os.path.dirname(os.path.abspath(input_filename))
         input_files = []
-        with open(input_filename) as file_list:
-            for line in file_list:
-                fname = line.rstrip()
-                full_path = os.path.join(list_dir, fname)
-                input_files.append(full_path)
-                logger.trace("Added file from list: %s", full_path)
+        with open(input_filename, 'r', encoding='utf-8') as file_list:
+            for line_num, line in enumerate(file_list, 1):
+                fname = line.strip()
+                if not fname or fname.startswith('#'):  # Skip empty lines and comments
+                    continue
+                
+                # Remove any quote characters from path
+                fname = fname.strip('"\'')
+                    
+                # Check if the path is absolute or has a drive letter (Windows)
+                if os.path.isabs(fname) or (len(fname) > 1 and fname[1] == ':'):
+                    full_path = fname  # Use as is if it's an absolute path
+                    logger.trace("Using absolute path from list: %s", full_path)
+                else:
+                    full_path = os.path.join(list_dir, fname)
+                    logger.trace("Using relative path from list: %s", full_path)
+                
+                # Handle directory paths by finding all audio files in the directory
+                if os.path.isdir(full_path):
+                    logger.debug("Path is a directory, finding audio files in: %s", full_path)
+                    dir_glob = os.path.join(full_path, "*")
+                    dir_files = sorted(filter_directories(glob.glob(dir_glob)))
+                    if dir_files:
+                        input_files.extend(dir_files)
+                        logger.debug("Found %d audio files in directory", len(dir_files))
+                    else:
+                        logger.warning("No audio files found in directory at line %d: %s", line_num, full_path)
+                elif os.path.isfile(full_path):
+                    input_files.append(full_path)
+                else:
+                    logger.warning("File not found at line %d: %s", line_num, full_path)
+        
         logger.debug("Found %d files in list file", len(input_files))
     else:
         logger.debug("Processing glob pattern: %s", input_filename)
