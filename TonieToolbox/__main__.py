@@ -15,7 +15,7 @@ from .tonie_analysis import check_tonie_file, split_to_opus_files
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary
 from .logger import setup_logging, get_logger
 from .filename_generator import guess_output_filename
-from .version_handler import check_for_updates
+from .version_handler import check_for_updates, clear_version_cache
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -45,8 +45,15 @@ def main():
                        help='Compare input file with another .taf file for debugging')
     parser.add_argument('--detailed-compare', action='store_true',
                        help='Show detailed OGG page differences when comparing files')
-    parser.add_argument('--skip-update-check', action='store_true',
+    
+    # Version check options
+    version_group = parser.add_argument_group('Version Check Options')
+    version_group.add_argument('--skip-update-check', action='store_true',
                        help='Skip checking for updates')
+    version_group.add_argument('--force-refresh-cache', action='store_true',
+                       help='Force refresh of update information from PyPI')
+    version_group.add_argument('--clear-version-cache', action='store_true',
+                       help='Clear cached version information')
     
     log_group = parser.add_argument_group('Logging Options')
     log_level_group = log_group.add_mutually_exclusive_group()
@@ -70,10 +77,22 @@ def main():
 
     setup_logging(log_level)
     logger = get_logger('main')
-    logger.debug("Starting TonieToolbox with log level: %s", logging.getLevelName(log_level))
+    logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
     
+    # Handle version cache operations
+    if args.clear_version_cache:
+        if clear_version_cache():
+            logger.info("Version cache cleared successfully")
+        else:
+            logger.info("No version cache to clear or error clearing cache")
+    
+    # Check for updates
     if not args.skip_update_check:
-        check_for_updates(quiet=args.silent or args.quiet)
+        logger.debug("Checking for updates (force_refresh=%s)", args.force_refresh_cache)
+        check_for_updates(
+            quiet=args.silent or args.quiet,
+            force_refresh=args.force_refresh_cache
+        )
 
     ffmpeg_binary = args.ffmpeg
     if ffmpeg_binary is None:

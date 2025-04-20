@@ -34,11 +34,13 @@ jobs:
         id: extract_notes
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
+          echo "Looking for version $VERSION in CHANGELOG.md"
+          
           # Extract the section for this version from CHANGELOG.md
-          # Starting from the line with version header to the next version header or end of file
-          awk -v ver="## [$VERSION]" '
+          # Looking for headers like "## [0.1.5] - 2025-04-20"
+          awk -v ver="$VERSION" '
             BEGIN { found=0; }
-            $0 ~ ver { found=1; print; next; }
+            $0 ~ "^## \\[" ver "\\] - " { found=1; print; next; }
             /^## \[/ { if(found) exit; }
             found { print; }
           ' CHANGELOG.md > release_notes.md
@@ -49,9 +51,10 @@ jobs:
             echo "Using default release notes"
             echo "## Release v$VERSION" > release_notes.md
             echo "Release v$VERSION" >> release_notes.md
+          else
+            echo "Found changelog entry for version $VERSION:"
+            cat release_notes.md
           fi
-          
-          cat release_notes.md
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
