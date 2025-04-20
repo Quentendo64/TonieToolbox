@@ -4,6 +4,8 @@ Happy Testing :-P
 
 A Python tool for converting audio files to Tonie box compatible format (TAF - Tonie Audio Format).
 
+# Beginners Guide
+- [HOWTO](HOWTO.md)
 
 ## Table of Contents
 

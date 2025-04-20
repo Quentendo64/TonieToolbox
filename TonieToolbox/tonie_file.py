@@ -12,7 +12,7 @@ import os
 from  . import tonie_header_pb2
 from .opus_packet import OpusPacket
 from .ogg_page import OggPage
-from .constants import OPUS_TAGS, SAMPLE_RATE_KHZ
+from .constants import OPUS_TAGS, SAMPLE_RATE_KHZ, TIMESTAMP_DEDUCT
 from .logger import get_logger
 
 # Setup logging
@@ -331,8 +331,8 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
                     timestamp = int(time.time())
                     logger.debug("Falling back to current timestamp: %d", timestamp)
         else:
-            timestamp = int(time.time())
-            logger.debug("Using current timestamp: %d", timestamp)
+            timestamp = int(time.time()-TIMESTAMP_DEDUCT)
+            logger.debug("Using current timestamp - 0x50000000: %d", timestamp)
 
         sha1 = hashlib.sha1()
 

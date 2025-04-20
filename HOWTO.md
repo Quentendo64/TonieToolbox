@@ -1,0 +1,227 @@
+# TonieToolbox for Beginners
+
+This guide will walk you through the process of setting up and using TonieToolbox to create custom audio content for your Tonie box, even if you have little to no technical experience.
+
+## Table of Contents
+- [Installing Python](#installing-python)
+  - [Windows](#windows)
+  - [macOS](#macos)
+  - [Linux](#linux)
+- [Installing TonieToolbox](#installing-tonietoolbox)
+- [Basic Usage](#basic-usage)
+- [Common Tasks](#common-tasks)
+- [Troubleshooting](#troubleshooting)
+
+## Installing Python
+
+Before you can use TonieToolbox, you need to have Python installed on your computer. Python is a programming language that TonieToolbox is built with.
+
+### Windows
+
+1. **Download Python**:
+   - Go to [python.org/downloads](https://python.org/downloads)
+   - Click on the "Download Python" button (get the latest version, 3.10 or higher)
+   
+2. **Install Python**:
+   - Open the downloaded file
+   - **IMPORTANT**: Check the box that says "Add Python to PATH" ✓
+   - Click "Install Now"
+   - Wait for the installation to complete
+
+3. **Verify Installation**:
+   - Open Command Prompt (search for "cmd" in the Start menu)
+   - Type `python --version` and press Enter
+   - You should see something like "Python 3.10.x" (your version might be different)
+
+### macOS
+
+1. **Download Python**:
+   - Go to [python.org/downloads](https://python.org/downloads)
+   - Download the macOS installer
+
+2. **Install Python**:
+   - Open the downloaded .pkg file
+   - Follow the installation instructions
+   - Complete the installation
+
+3. **Verify Installation**:
+   - Open Terminal (find it in Applications > Utilities > Terminal)
+   - Type `python3 --version` and press Enter
+   - You should see the Python version number
+
+### Linux
+
+Most Linux distributions come with Python pre-installed. To check:
+
+1. Open Terminal
+2. Type `python3 --version` and press Enter
+
+If Python is not installed or you need a newer version:
+
+- **Ubuntu/Debian**: Run `sudo apt update` then `sudo apt install python3 python3-pip`
+- **Fedora**: Run `sudo dnf install python3 python3-pip`
+- **Arch Linux**: Run `sudo pacman -S python python-pip`
+
+## Installing TonieToolbox
+
+Once Python is installed, you can install TonieToolbox using pip (Python's package installer):
+
+1. **Open a terminal or command prompt**
+
+2. **Install TonieToolbox**:
+   ```
+   pip install tonietoolbox
+   ```
+   
+   If that doesn't work, try:
+   ```
+   pip3 install tonietoolbox
+   ```
+
+3. **Verify installation**:
+   ```
+   tonietoolbox --version
+   ```
+   You should see the version number of TonieToolbox
+
+## Basic Usage
+
+Here are the most common ways to use TonieToolbox:
+
+### Converting a Single Audio File
+
+1. **Open a terminal or command prompt**
+
+2. **Navigate to the folder containing your audio file**:
+   - Windows: `cd C:\path\to\your\folder`
+   - Mac/Linux: `cd /path/to/your/folder`
+
+3. **Convert the file**:
+   ```
+   tonietoolbox yourfile.mp3
+   ```
+
+   This will create a file named `yourfile.taf` in the `output` folder.
+
+### Converting Multiple Audio Files in one folder
+
+1. **Open a terminal or command prompt**
+
+2. **Navigate to the folder containing your audio folder**:
+   - Windows: `cd C:\path\to\your\folder`
+   - Mac/Linux: `cd /path/to/your/folder`
+
+3. **Convert the files in the folder**:
+   ```
+   tonietoolbox subfolder/
+   ```
+
+   This will create a file named `subfolder.taf` in the `output` folder.
+
+### Converting Multiple Audio Files from different locations
+
+1. **Create a new text file** with the extension `.lst`
+
+2. **Add the paths** to your audio files in the order you want them on your Tonie, one per line:
+   ```
+   C:\path\to\track1.mp3
+   C:\path\to\track2.mp3
+   C:\path\to\track3.mp3
+   ```
+
+3. **Save the file** as `playlist.lst`
+
+4. **Convert using the list file**:
+   ```
+   tonietoolbox playlist.lst
+   ```
+
+## Common Tasks
+
+### Naming Your Output File
+
+To specify the name of your output file:
+
+```
+tonietoolbox input.mp3 my_tonie.taf
+```
+
+### Setting a Custom Bit Rate
+
+For higher quality audio (uses more space):
+
+```
+tonietoolbox input.mp3 --bitrate 128
+```
+
+For lower quality audio (saves space):
+
+```
+tonietoolbox input.mp3 --bitrate 64
+```
+
+The default is 96 kbps.
+
+### Analyzing a Tonie File
+
+To check if a Tonie file is valid:
+
+```
+tonietoolbox --info my_tonie.taf
+```
+
+### Splitting a Tonie File
+
+To extract individual tracks from a Tonie file:
+
+```
+tonietoolbox --split my_tonie.taf
+```
+
+## Troubleshooting
+
+### Missing FFmpeg or opus-tools
+
+TonieToolbox requires FFmpeg and opus-tools to convert audio files. If you get an error about missing tools:
+
+1. **Use auto-download feature**:
+   ```
+   tonietoolbox input.mp3 --auto-download
+   ```
+   This will download the required tools automatically.
+
+2. **Or install them manually**:
+   - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and [opus-tools.org](https://opus-codec.org/downloads/)
+   - **macOS**: Use Homebrew: `brew install ffmpeg opus-tools`
+   - **Linux**: Use your package manager, e.g., `sudo apt install ffmpeg opus-tools`
+
+### Common Errors
+
+#### "Command not found"
+
+If you see `tonietoolbox: command not found`, try:
+- Using `python -m tonietoolbox` instead
+- Making sure Python's scripts folder is in your PATH
+- Reinstalling with: `pip install --user tonietoolbox`
+
+#### Audio Quality Issues
+
+If your audio sounds bad:
+- Try increasing the bitrate: `tonietoolbox input.mp3 --bitrate 128`
+- Make sure your source audio is good quality
+
+#### File Size Too Large
+
+If your TAF file is too big for your Tonie:
+- Use a lower bitrate: `tonietoolbox input.mp3 --bitrate 64`
+- Shorten your audio files
+
+### Getting Help
+
+To see all available options:
+
+```
+tonietoolbox --help
+```
+
+For more detailed information, refer to the [README.md](README.md) file or visit the project GitHub page.
