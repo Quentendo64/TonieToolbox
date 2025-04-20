@@ -19,6 +19,7 @@ A Python tool for converting audio files to Tonie box compatible format (TAF - T
   - [Basic Usage](#basic-usage)
   - [Advanced Options](#advanced-options)
   - [Common Usage Examples](#common-usage-examples)
+  - [Media Tags](#media-tags)
 - [Technical Details](#technical-details)
   - [TAF File Structure](#taf-tonie-audio-format-file-structure)
   - [File Analysis](#file-analysis)
@@ -40,15 +41,17 @@ The tool provides several capabilities:
 - Split Tonie files into individual opus tracks
 - Compare two TAF files for debugging differences
 - Support various input formats through FFmpeg conversion
+- Extract and use audio media tags (ID3, Vorbis Comments, etc.) for better file naming
 
 ## Requirements
 
 - Python 3.6 or higher
-- FFmpeg (for converting non-opus audio files).
+- FFmpeg (for converting non-opus audio files)
 - opus-tools (specifically `opusenc` for encoding to opus format)
+- mutagen (for reading audio file metadata, auto-installed when needed)
 
 Make sure FFmpeg and opus-tools are installed on your system and accessible in your PATH.
-If the requirements are not found in PATH. TonieToolbox will download the missing requirements.
+If the requirements are not found in PATH. TonieToolbox will download the missing requirements with --auto-download.
 
 ## Installation
 
@@ -139,7 +142,8 @@ Output:
 ```
 usage: TonieToolbox.py [-h] [-v] [-t TIMESTAMP] [-f FFMPEG] [-o OPUSENC] 
                     [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
-                    [-A] [-k] [-C FILE2] [-D] [-d] [-T] [-q] [-Q]
+                    [-A] [-k] [-C FILE2] [-D] [-m] [--name-template TEMPLATE]
+                    [--show-tags] [-d] [-T] [-q] [-Q]
                     SOURCE [TARGET]
 
 Create Tonie compatible file from Ogg opus file(s).
@@ -170,6 +174,12 @@ optional arguments:
   -C, --compare FILE2   Compare input file with another .taf file for debugging
   -D, --detailed-compare
                         Show detailed OGG page differences when comparing files
+
+Media Tag Options:
+  -m, --use-media-tags  Use media tags from audio files for naming
+  --name-template TEMPLATE
+                        Template for naming files using media tags. Example: "{album} - {artist}"
+  --show-tags           Show available media tags from input files
 
 Version Check Options:
   -S, --skip-update-check
@@ -240,6 +250,52 @@ Process a music collection with nested album folders and save TAF files alongsid
 
 ```
 tonietoolbox --recursive --output-to-source "\Hörspiele\"
+```
+
+### Media Tags
+
+TonieToolbox can read metadata tags from audio files (such as ID3 tags in MP3 files, Vorbis comments in FLAC/OGG files, etc.) and use them to create more meaningful filenames or display information about your audio collection.
+
+#### View available tags in audio files:
+
+To see what tags are available in your audio files:
+
+```
+tonietoolbox --show-tags input.mp3
+```
+
+This will display all readable tags from the file, which can be useful for creating naming templates.
+
+#### Use media tags for file naming:
+
+To use the metadata from audio files when generating output filenames:
+
+```
+tonietoolbox input.mp3 --use-media-tags
+```
+
+For single files, this will use a default template of "{title} - {artist}" for the output filename.
+
+#### Custom naming templates:
+
+You can specify custom templates for generating filenames based on the audio metadata:
+
+```
+tonietoolbox input.mp3 --use-media-tags --name-template "{artist} - {album} - {title}"
+```
+
+#### Recursive processing with media tags:
+
+When processing folders recursively, media tags can provide more consistent naming:
+
+```
+tonietoolbox --recursive --use-media-tags "Music/Collection/"
+```
+
+This will attempt to use the album information from the audio files for naming the output files:
+
+```
+tonietoolbox --recursive --use-media-tags --name-template "{date} - {album} ({artist})" "Music/Collection/"
 ```
 
 ## Technical Details

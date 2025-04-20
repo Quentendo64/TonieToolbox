@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upload to TeddyCloud Library
 - Download-option with rip
 
-## [0.2.0] - 2025-04-20
+## [0.2.3] - 2025-04-20
+### Added
+- Using media tags for .TAF naming --use-media-tags | --use-media-tags --name-template "{artist} - {album} - {title}"
+## [0.2.2] - 2025-04-20
+### Added
+- dynamic opus header / comments creation
+## [0.2.1] - 2025-04-20
 ### Added
 - short versions (aliases) for all the command-line arguments
 ## [0.2.0] - 2025-04-20

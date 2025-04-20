@@ -52,6 +52,10 @@ DEPENDENCIES = {
         'darwin': {
             'package': 'opus-tools'
         }
+    },
+    'mutagen': {
+        'package': 'mutagen',
+        'python_package': True
     }
 }
 
@@ -364,6 +368,92 @@ def install_package(package_name):
     except subprocess.CalledProcessError as e:
         logger.error("Failed to install %s: %s", package_name, e)
         return False
+
+def install_python_package(package_name):
+    """
+    Attempt to install a Python package using pip.
+    
+    Args:
+        package_name (str): Name of the package to install
+        
+    Returns:
+        bool: True if installation was successful, False otherwise
+    """
+    logger.info("Attempting to install Python package: %s", package_name)
+    try:
+        import subprocess
+        import sys
+        
+        # Try to install the package using pip
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        logger.info("Successfully installed Python package: %s", package_name)
+        return True
+    except Exception as e:
+        logger.error("Failed to install Python package %s: %s", package_name, str(e))
+        return False
+
+def check_python_package(package_name):
+    """
+    Check if a Python package is installed.
+    
+    Args:
+        package_name (str): Name of the package to check
+        
+    Returns:
+        bool: True if the package is installed, False otherwise
+    """
+    logger.debug("Checking if Python package is installed: %s", package_name)
+    try:
+        __import__(package_name)
+        logger.debug("Python package %s is installed", package_name)
+        return True
+    except ImportError:
+        logger.debug("Python package %s is not installed", package_name)
+        return False
+
+def ensure_mutagen(auto_install=True):
+    """
+    Ensure that the Mutagen library is available, installing it if necessary and allowed.
+    
+    Args:
+        auto_install (bool): Whether to automatically install Mutagen if not found (defaults to True)
+        
+    Returns:
+        bool: True if Mutagen is available, False otherwise
+    """
+    logger.debug("Checking if Mutagen is available")
+    
+    try:
+        import mutagen
+        logger.debug("Mutagen is already installed")
+        return True
+    except ImportError:
+        logger.debug("Mutagen is not installed")
+        
+        if auto_install:
+            logger.info("Auto-install enabled, attempting to install Mutagen")
+            if install_python_package('mutagen'):
+                try:
+                    import mutagen
+                    logger.info("Successfully installed and imported Mutagen")
+                    return True
+                except ImportError:
+                    logger.error("Mutagen was installed but could not be imported")
+            else:
+                logger.error("Failed to install Mutagen")
+        else:
+            logger.warning("Mutagen is not installed and --auto-download is not used.")
+        
+        return False
+
+def is_mutagen_available():
+    """
+    Check if the Mutagen library is available.
+    
+    Returns:
+        bool: True if Mutagen is available, False otherwise
+    """
+    return check_python_package('mutagen')
 
 def ensure_dependency(dependency_name, auto_download=False):
     """

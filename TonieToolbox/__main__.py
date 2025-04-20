@@ -17,6 +17,7 @@ from .logger import setup_logging, get_logger
 from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
+from .media_tags import is_available as is_media_tags_available, ensure_mutagen
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -52,6 +53,15 @@ def main():
     parser.add_argument('-D', '--detailed-compare', action='store_true',
                        help='Show detailed OGG page differences when comparing files')
     
+    # Media tag options
+    media_tag_group = parser.add_argument_group('Media Tag Options')
+    media_tag_group.add_argument('-m', '--use-media-tags', action='store_true',
+                       help='Use media tags from audio files for naming')
+    media_tag_group.add_argument('--name-template', metavar='TEMPLATE', action='store',
+                       help='Template for naming files using media tags. Example: "{album} - {artist}"')
+    media_tag_group.add_argument('--show-tags', action='store_true',
+                       help='Show available media tags from input files')
+    
     # Version check options
     version_group = parser.add_argument_group('Version Check Options')
     version_group.add_argument('-S', '--skip-update-check', action='store_true',
@@ -85,14 +95,12 @@ def main():
     logger = get_logger('main')
     logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
     
-    # Handle version cache operations
     if args.clear_version_cache:
         if clear_version_cache():
             logger.info("Version cache cleared successfully")
         else:
             logger.info("No version cache to clear or error clearing cache")
     
-    # Check for updates
     if not args.skip_update_check:
         logger.debug("Checking for updates (force_refresh=%s)", args.force_refresh_cache)
         is_latest, latest_version, message, update_confirmed = check_for_updates(
@@ -119,10 +127,24 @@ def main():
             sys.exit(1)
         logger.debug("Using opusenc binary: %s", opus_binary)
 
+    # Check for media tags library and handle --show-tags option
+    if (args.use_media_tags or args.show_tags or args.name_template) and not is_media_tags_available():
+        if not ensure_mutagen(auto_install=args.auto_download):
+            logger.warning("Media tags functionality requires the mutagen library but it could not be installed.")
+            if args.use_media_tags or args.show_tags:
+                logger.error("Cannot proceed with --use-media-tags or --show-tags without mutagen library")
+                sys.exit(1)
+        else:
+            logger.info("Successfully enabled media tag support")
+
     # Handle recursive processing
     if args.recursive:
         logger.info("Processing folders recursively: %s", args.input_filename)
-        process_tasks = process_recursive_folders(args.input_filename)
+        process_tasks = process_recursive_folders(
+            args.input_filename,
+            use_media_tags=args.use_media_tags,
+            name_template=args.name_template
+        )
         
         if not process_tasks:
             logger.error("No folders with audio files found for recursive processing")
@@ -178,8 +200,104 @@ def main():
         logger.error("No files found for pattern %s", args.input_filename)
         sys.exit(1)
 
+    # Show tags for input files if requested
+    if args.show_tags:
+        from .media_tags import get_file_tags
+        logger.info("Showing media tags for input files:")
+        
+        for file_index, file_path in enumerate(files):
+            tags = get_file_tags(file_path)
+            if tags:
+                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)}")
+                print("-" * 40)
+                for tag_name, tag_value in sorted(tags.items()):
+                    print(f"{tag_name}: {tag_value}")
+            else:
+                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)} - No tags found")
+        
+        sys.exit(0)
+        
+    # Use media tags for file naming if requested
+    guessed_name = None
+    if args.use_media_tags:
+        # If this is a single folder, try to get consistent album info
+        if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
+            folder_path = os.path.dirname(files[0])
+            
+            from .media_tags import extract_album_info, format_metadata_filename
+            logger.debug("Extracting album info from folder: %s", folder_path)
+            
+            album_info = extract_album_info(folder_path)
+            if album_info:
+                # Use album info for naming the output file
+                template = args.name_template or "{album} - {artist}"
+                new_name = format_metadata_filename(album_info, template)
+                
+                if new_name:
+                    logger.info("Using album metadata for output filename: %s", new_name)
+                    guessed_name = new_name
+                else:
+                    logger.debug("Could not format filename from album metadata")
+        
+        # For single files, use the file's metadata
+        elif len(files) == 1:
+            from .media_tags import get_file_tags, format_metadata_filename
+            
+            tags = get_file_tags(files[0])
+            if tags:
+                template = args.name_template or "{title} - {artist}"
+                new_name = format_metadata_filename(tags, template)
+                
+                if new_name:
+                    logger.info("Using file metadata for output filename: %s", new_name)
+                    guessed_name = new_name
+                else:
+                    logger.debug("Could not format filename from file metadata")
+        
+        # For multiple files from different folders, try to use common tags if they exist
+        elif len(files) > 1:
+            from .media_tags import get_file_tags, format_metadata_filename
+            
+            # Try to find common tags among files
+            common_tags = {}
+            for file_path in files:
+                tags = get_file_tags(file_path)
+                if tags:
+                    for key, value in tags.items():
+                        if key in ['album', 'albumartist', 'artist']:
+                            if key not in common_tags:
+                                common_tags[key] = value
+                            # Only keep values that are the same across files
+                            elif common_tags[key] != value:
+                                common_tags[key] = None
+            
+            # Remove None values
+            common_tags = {k: v for k, v in common_tags.items() if v is not None}
+            
+            if common_tags:
+                template = args.name_template or "Collection - {album}" if 'album' in common_tags else "Collection"
+                new_name = format_metadata_filename(common_tags, template)
+                
+                if new_name:
+                    logger.info("Using common metadata for output filename: %s", new_name)
+                    guessed_name = new_name
+                else:
+                    logger.debug("Could not format filename from common metadata")
+
     if args.output_filename:
         out_filename = args.output_filename
+    elif guessed_name:
+        if args.output_to_source:
+            source_dir = os.path.dirname(files[0]) if files else '.'
+            out_filename = os.path.join(source_dir, guessed_name)
+            logger.debug("Using source location for output with media tags: %s", out_filename)
+        else:
+            output_dir = './output'
+            if not os.path.exists(output_dir):
+                logger.debug("Creating default output directory: %s", output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+            out_filename = os.path.join(output_dir, guessed_name)
+            logger.debug("Using default output location with media tags: %s", out_filename)
     else:
         guessed_name = guess_output_filename(args.input_filename, files)    
         if args.output_to_source:

@@ -204,12 +204,101 @@ def extract_folder_meta(folder_path: str) -> Dict[str, str]:
     return meta
 
 
-def process_recursive_folders(root_path: str) -> List[Tuple[str, str, List[str]]]:
+def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False, template: str = None) -> str:
+    """
+    Generate a suitable output filename for a folder based on folder name
+    and optionally audio file metadata.
+    
+    Args:
+        folder_path: Path to folder
+        use_media_tags: Whether to use media tags from audio files if available
+        template: Optional template for formatting output name using media tags
+        
+    Returns:
+        String with cleaned output name
+    """
+    # Start with folder name metadata
+    folder_meta = extract_folder_meta(folder_path)
+    output_name = None
+    
+    # Try to get metadata from audio files if requested
+    if use_media_tags:
+        try:
+            # Import here to avoid circular imports
+            from .media_tags import extract_album_info, format_metadata_filename, is_available, normalize_tag_value
+            
+            if is_available():
+                logger.debug("Using media tags to generate folder name for: %s", folder_path)
+                
+                # Get album metadata from the files
+                album_info = extract_album_info(folder_path)
+                
+                if album_info:
+                    # Normalize all tag values to handle special characters
+                    for key, value in album_info.items():
+                        album_info[key] = normalize_tag_value(value)
+                    
+                    # Add folder metadata as fallback values
+                    if 'number' in folder_meta and folder_meta['number']:
+                        if 'tracknumber' not in album_info or not album_info['tracknumber']:
+                            album_info['tracknumber'] = folder_meta['number']
+                    
+                    if 'title' in folder_meta and folder_meta['title']:
+                        if 'album' not in album_info or not album_info['album']:
+                            album_info['album'] = normalize_tag_value(folder_meta['title'])
+                    
+                    # Use template or default format
+                    format_template = template or "{album}"
+                    if 'artist' in album_info and album_info['artist']:
+                        format_template = format_template + " - {artist}"
+                    if 'number' in folder_meta and folder_meta['number']:
+                        format_template = "{tracknumber} - " + format_template
+                    
+                    formatted_name = format_metadata_filename(album_info, format_template)
+                    
+                    if formatted_name:
+                        logger.debug("Generated name from media tags: %s", formatted_name)
+                        output_name = formatted_name
+        except Exception as e:
+            logger.warning("Error using media tags for folder naming: %s", str(e))
+    
+    # Fall back to folder name parsing if no media tags or if media tag extraction failed
+    if not output_name:
+        if folder_meta['number'] and folder_meta['title']:
+            # Apply normalization to the title from the folder name
+            try:
+                from .media_tags import normalize_tag_value
+                normalized_title = normalize_tag_value(folder_meta['title'])
+                output_name = f"{folder_meta['number']} - {normalized_title}"
+            except:
+                output_name = f"{folder_meta['number']} - {folder_meta['title']}"
+        else:
+            # Try to normalize the folder name itself
+            folder_name = os.path.basename(folder_path)
+            try:
+                from .media_tags import normalize_tag_value
+                output_name = normalize_tag_value(folder_name)
+            except:
+                output_name = folder_name
+    
+    # Clean up the output name (remove invalid filename characters)
+    output_name = re.sub(r'[<>:"/\\|?*]', '_', output_name)
+    output_name = output_name.replace("???", "Fragezeichen")
+    output_name = output_name.replace("!!!", "Ausrufezeichen")
+    
+    logger.debug("Final generated output name: %s", output_name)
+    return output_name
+
+
+def process_recursive_folders(root_path: str, use_media_tags: bool = False, 
+                            name_template: str = None) -> List[Tuple[str, str, List[str]]]:
     """
     Process folders recursively and prepare data for conversion.
     
     Args:
         root_path: Root directory to start processing from
+        use_media_tags: Whether to use media tags from audio files for naming
+        name_template: Optional template for formatting output names using media tags
         
     Returns:
         List of tuples: (output_filename, folder_path, list_of_audio_files)
@@ -230,17 +319,13 @@ def process_recursive_folders(root_path: str) -> List[Tuple[str, str, List[str]]
         # Use natural sort order to ensure consistent results
         audio_files = natural_sort(audio_files)
         
-        meta = extract_folder_meta(folder_path)
-        
         if audio_files:
-            # Create output filename from metadata
-            if meta['number'] and meta['title']:
-                output_name = f"{meta['number']} - {meta['title']}"
-            else:
-                output_name = os.path.basename(folder_path)
-                
-            # Clean up the output name (remove invalid filename characters)
-            output_name = re.sub(r'[<>:"/\\|?*]', '_', output_name)
+            # Generate output filename using metadata
+            output_name = get_folder_name_from_metadata(
+                folder_path, 
+                use_media_tags=use_media_tags, 
+                template=name_template
+            )
             
             results.append((output_name, folder_path, audio_files))
             logger.debug("Created processing task: %s -> %s (%d files)", 
