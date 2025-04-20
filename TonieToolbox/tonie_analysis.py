@@ -72,7 +72,8 @@ def get_header_info(in_file):
         
     Returns:
         tuple: Header size, Tonie header object, file size, audio size, SHA1 sum,
-               Opus header found flag, Opus version, channel count, sample rate, bitstream serial number
+               Opus header found flag, Opus version, channel count, sample rate, bitstream serial number,
+               Opus comments dictionary
                
     Raises:
         RuntimeError: If OGG pages cannot be found
@@ -112,17 +113,64 @@ def get_header_info(in_file):
     logger.debug("Opus header found: %s, Version: %d, Channels: %d, Sample rate: %d Hz, Serial: %d", 
                 opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no)
 
+    # Read and parse Opus comments from the second page
+    opus_comments = {}
     found = OggPage.seek_to_page_header(in_file)
     if not found:
         logger.error("Second OGG page not found")
         raise RuntimeError("Second ogg page not found")
     
-    OggPage(in_file)
+    second_page = OggPage(in_file)
     logger.debug("Read second OGG page")
+    
+    try:
+        # Combine all segments data for the second page
+        comment_data = bytearray()
+        for segment in second_page.segments:
+            comment_data.extend(segment.data)
+        
+        if comment_data.startswith(b"OpusTags"):
+            pos = 8  # Skip "OpusTags"
+            # Extract vendor string
+            if pos + 4 <= len(comment_data):
+                vendor_length = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                pos += 4
+                if pos + vendor_length <= len(comment_data):
+                    vendor = comment_data[pos:pos+vendor_length].decode('utf-8', errors='replace')
+                    opus_comments["vendor"] = vendor
+                    pos += vendor_length
+                    
+                    # Extract comments count
+                    if pos + 4 <= len(comment_data):
+                        comments_count = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                        pos += 4
+                        
+                        # Extract individual comments
+                        for i in range(comments_count):
+                            if pos + 4 <= len(comment_data):
+                                comment_length = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                                pos += 4
+                                if pos + comment_length <= len(comment_data):
+                                    comment = comment_data[pos:pos+comment_length].decode('utf-8', errors='replace')
+                                    pos += comment_length
+                                    
+                                    # Split comment into key/value if possible
+                                    if "=" in comment:
+                                        key, value = comment.split("=", 1)
+                                        opus_comments[key] = value
+                                    else:
+                                        opus_comments[f"comment_{i}"] = comment
+                                else:
+                                    break
+                            else:
+                                break
+    except Exception as e:
+        logger.error("Failed to parse Opus comments: %s", str(e))
 
     return (
         header_size, tonie_header, file_size, audio_size, sha1sum,
-        opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no
+        opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no,
+        opus_comments
     )
 
 
@@ -204,7 +252,7 @@ def check_tonie_file(filename):
     
     with open(filename, "rb") as in_file:
         header_size, tonie_header, file_size, audio_size, sha1, opus_head_found, \
-        opus_version, channel_count, sample_rate, bitstream_serial_no = get_header_info(in_file)
+        opus_version, channel_count, sample_rate, bitstream_serial_no, opus_comments = get_header_info(in_file)
 
         page_count, alignment_okay, page_size_okay, total_time, \
         chapters = get_audio_info(in_file, sample_rate, tonie_header, header_size)
@@ -254,6 +302,20 @@ def check_tonie_file(filename):
     print("")
     print("[{}] File is {}valid".format("OK" if all_ok else "NOT OK", "" if all_ok else "NOT "))
     print("")
+    
+    # Display Opus comments if available
+    if opus_comments:
+        print("[ii] Opus Comments:")
+        if "vendor" in opus_comments:
+            print("  Vendor: {}".format(opus_comments["vendor"]))
+            # Remove vendor from dict to avoid showing it twice
+            vendor = opus_comments.pop("vendor")
+            
+        # Sort remaining comments for consistent display
+        for key in sorted(opus_comments.keys()):
+            print("  {}: {}".format(key, opus_comments[key]))
+        print("")
+        
     print("[ii] Total runtime: {}".format(granule_to_time_string(total_time)))
     print("[ii] {} Tracks:".format(len(chapters)))
     for i in range(0, len(chapters)):

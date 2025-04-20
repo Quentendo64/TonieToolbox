@@ -533,3 +533,48 @@ def get_opus_binary(auto_download=False):
         str: Path to the opusenc binary if available, None otherwise
     """
     return ensure_dependency('opusenc', auto_download)
+
+def get_opus_version(opus_binary=None):
+    """
+    Get the version of opusenc.
+    
+    Args:
+        opus_binary: Path to the opusenc binary
+        
+    Returns:
+        str: The version string of opusenc, or a fallback string if the version cannot be determined
+    """
+    import subprocess
+    import re
+    
+    logger = get_logger('dependency_manager')
+    
+    if opus_binary is None:
+        opus_binary = get_opus_binary()
+    
+    if opus_binary is None:
+        logger.debug("opusenc binary not found, using fallback version string")
+        return "opusenc from opus-tools XXX"  # Fallback
+    
+    try:
+        # Run opusenc --version and capture output
+        result = subprocess.run([opus_binary, "--version"], 
+                                capture_output=True, text=True, check=False)
+        
+        # Extract version information from output
+        version_output = result.stdout.strip() or result.stderr.strip()
+        
+        if version_output:
+            # Try to extract just the version information using regex
+            match = re.search(r"(opusenc.*)", version_output)
+            if match:
+                return match.group(1)
+            else:
+                return version_output.splitlines()[0]  # Use first line
+        else:
+            logger.debug("Could not determine opusenc version, using fallback")
+            return "opusenc from opus-tools XXX"  # Fallback
+    
+    except Exception as e:
+        logger.debug(f"Error getting opusenc version: {str(e)}")
+        return "opusenc from opus-tools XXX"  # Fallback

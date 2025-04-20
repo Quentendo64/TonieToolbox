@@ -19,6 +19,33 @@ from .logger import get_logger
 logger = get_logger('tonie_file')
 
 
+def toniefile_comment_add(buffer, length, comment_str):
+    """
+    Add a comment string to an Opus comment packet buffer.
+    
+    Args:
+        buffer: Bytearray buffer to add comment to
+        length: Current position in the buffer
+        comment_str: Comment string to add
+        
+    Returns:
+        int: New position in the buffer after adding comment
+    """
+    logger.debug("Adding comment: %s", comment_str)
+    
+    # Add 4-byte length prefix
+    str_length = len(comment_str)
+    buffer[length:length+4] = struct.pack("<I", str_length)
+    length += 4
+    
+    # Add the actual string
+    buffer[length:length+str_length] = comment_str.encode('utf-8')
+    length += str_length
+    
+    logger.trace("Added comment of length %d, new buffer position: %d", str_length, length)
+    return length
+
+
 def check_identification_header(page):
     """
     Check if a page contains a valid Opus identification header.
@@ -52,37 +79,103 @@ def check_identification_header(page):
     logger.debug("Opus identification header is valid")
 
 
-def prepare_opus_tags(page):
+def prepare_opus_tags(page, custom_tags=False, bitrate=64, vbr=True, opus_binary=None):
     """
     Prepare standard Opus tags for a Tonie file.
     
     Args:
         page: OggPage to modify
+        custom_tags: Whether to use custom TonieToolbox tags instead of default ones
+        bitrate: Actual bitrate used for encoding
+        vbr: Whether variable bitrate was used
+        opus_binary: Path to opusenc binary for version detection
         
     Returns:
         OggPage: Modified page with Tonie-compatible Opus tags
     """
     logger.debug("Preparing Opus tags for Tonie compatibility")
     page.segments.clear()
-    segment = OpusPacket(None)
-    segment.size = len(OPUS_TAGS[0])
-    segment.data = bytearray(OPUS_TAGS[0])
-    segment.spanning_packet = True
-    segment.first_packet = True
-    page.segments.append(segment)
+    
+    if not custom_tags:
+        # Use the default hardcoded tags for backward compatibility
+        segment = OpusPacket(None)
+        segment.size = len(OPUS_TAGS[0])
+        segment.data = bytearray(OPUS_TAGS[0])
+        segment.spanning_packet = True
+        segment.first_packet = True
+        page.segments.append(segment)
 
-    segment = OpusPacket(None)
-    segment.size = len(OPUS_TAGS[1])
-    segment.data = bytearray(OPUS_TAGS[1])
-    segment.spanning_packet = False
-    segment.first_packet = False
-    page.segments.append(segment)
+        segment = OpusPacket(None)
+        segment.size = len(OPUS_TAGS[1])
+        segment.data = bytearray(OPUS_TAGS[1])
+        segment.spanning_packet = False
+        segment.first_packet = False
+        page.segments.append(segment)
+    else:
+        # Use custom tags for TonieToolbox
+        # Create buffer for opus tags (similar to teddyCloud implementation)
+        logger.debug("Creating custom Opus tags")
+        comment_data = bytearray(0x1B4)  # Same size as in teddyCloud
+        
+        # OpusTags signature
+        comment_data_pos = 0
+        comment_data[comment_data_pos:comment_data_pos+8] = b"OpusTags"
+        comment_data_pos += 8
+        
+        # Vendor string
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, "TonieToolbox")
+        
+        # Number of comments (3 comments: version, encoder info, and encoder options)
+        comments_count = 3
+        comment_data[comment_data_pos:comment_data_pos+4] = struct.pack("<I", comments_count)
+        comment_data_pos += 4
+        
+        # Add version information
+        from . import __version__
+        version_str = f"version={__version__}"
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, version_str)
+        
+        # Get actual opusenc version
+        from .dependency_manager import get_opus_version
+        encoder_info = get_opus_version(opus_binary)
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, f"encoder={encoder_info}")
+        
+        # Create encoder options string with actual settings
+        vbr_opt = "--vbr" if vbr else "--cbr"
+        encoder_options = f"encoder_options=--bitrate {bitrate} {vbr_opt}"
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, encoder_options)
+        
+        # Add padding
+        remain = len(comment_data) - comment_data_pos - 4
+        comment_data[comment_data_pos:comment_data_pos+4] = struct.pack("<I", remain)
+        comment_data_pos += 4
+        comment_data[comment_data_pos:comment_data_pos+4] = b"pad="
+        
+        # Create segments - handle data in chunks of 255 bytes maximum
+        comment_data = comment_data[:comment_data_pos + remain]  # Trim to actual used size
+        
+        # Split large data into smaller segments (each <= 255 bytes)
+        remaining_data = comment_data
+        first_segment = True
+        
+        while remaining_data:
+            chunk_size = min(255, len(remaining_data))
+            segment = OpusPacket(None)
+            segment.size = chunk_size
+            segment.data = remaining_data[:chunk_size]
+            segment.spanning_packet = len(remaining_data) > chunk_size  # More data follows
+            segment.first_packet = first_segment
+            page.segments.append(segment)
+            
+            remaining_data = remaining_data[chunk_size:]
+            first_segment = False
+        
     page.correct_values(0)
     logger.trace("Opus tags prepared with %d segments", len(page.segments))
     return page
 
 
-def copy_first_and_second_page(in_file, out_file, timestamp, sha):
+def copy_first_and_second_page(in_file, out_file, timestamp, sha, use_custom_tags=True, bitrate=64, vbr=True, opus_binary=None):
     """
     Copy and modify the first two pages of an Opus file for a Tonie file.
     
@@ -91,9 +184,10 @@ def copy_first_and_second_page(in_file, out_file, timestamp, sha):
         out_file: Output file handle
         timestamp: Timestamp to use for the Tonie file
         sha: SHA1 hash object to update with written data
-        
-    Raises:
-        RuntimeError: If OGG pages cannot be found
+        use_custom_tags: Whether to use custom TonieToolbox tags
+        bitrate: Actual bitrate used for encoding
+        vbr: Whether VBR was used
+        opus_binary: Path to opusenc binary
     """
     logger.debug("Copying first and second pages with timestamp %d", timestamp)
     found = OggPage.seek_to_page_header(in_file)
@@ -116,7 +210,7 @@ def copy_first_and_second_page(in_file, out_file, timestamp, sha):
     page = OggPage(in_file)
     page.serial_no = timestamp
     page.checksum = page.calc_checksum()
-    page = prepare_opus_tags(page)
+    page = prepare_opus_tags(page, use_custom_tags, bitrate, vbr, opus_binary)
     page.write_page(out_file, sha)
     logger.debug("Second page written successfully")
 
@@ -277,7 +371,8 @@ def fix_tonie_header(out_file, chapters, timestamp, sha):
 
 
 def create_tonie_file(output_file, input_files, no_tonie_header=False, user_timestamp=None,
-                     bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False, auto_download=False):
+                     bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False, auto_download=False, 
+                     use_custom_tags=True):
     """
     Create a Tonie file from input files.
     
@@ -292,6 +387,7 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
         opus_binary: Path to opusenc binary
         keep_temp: Whether to keep temporary opus files for testing
         auto_download: Whether to automatically download dependencies if not found
+        use_custom_tags: Whether to use dynamic comment tags generated with toniefile_comment_add
     """
     from .audio_conversion import get_opus_tempfile
     
@@ -369,7 +465,7 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
             try:
                 if next_page_no == 2:
                     logger.debug("Processing first file: copying first and second page")
-                    copy_first_and_second_page(handle, out_file, timestamp, sha1)
+                    copy_first_and_second_page(handle, out_file, timestamp, sha1, use_custom_tags, bitrate, vbr, opus_binary)
                 else:
                     logger.debug("Processing subsequent file: skipping first and second page")
                     other_size = max_size

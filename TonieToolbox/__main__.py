@@ -45,6 +45,8 @@ def main():
     parser.add_argument('-A', '--auto-download', action='store_true', help='Automatically download FFmpeg and opusenc if needed')
     parser.add_argument('-k', '--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
+    parser.add_argument('-u', '--use-legacy-tags', action='store_true',
+                       help='Use legacy hardcoded tags instead of dynamic TonieToolbox tags')
     parser.add_argument('-C', '--compare', action='store', metavar='FILE2', 
                        help='Compare input file with another .taf file for debugging')
     parser.add_argument('-D', '--detailed-compare', action='store_true',
@@ -143,7 +145,7 @@ def main():
             
             create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
                            args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                           args.auto_download)
+                           args.auto_download, not args.use_legacy_tags)
             logger.info("Successfully created Tonie file: %s", task_out_filename)
             
         logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
@@ -207,7 +209,8 @@ def main():
     
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
-                     args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, args.auto_download)
+                     args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
+                     args.auto_download, not args.use_legacy_tags)
     logger.info("Successfully created Tonie file: %s", out_filename)
 
 
