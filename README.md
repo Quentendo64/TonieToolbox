@@ -20,12 +20,14 @@ A Python tool for converting audio files to Tonie box compatible format (TAF - T
   - [Advanced Options](#advanced-options)
   - [Common Usage Examples](#common-usage-examples)
   - [Media Tags](#media-tags)
+  - [TeddyCloud Upload](#teddycloud-upload)
 - [Technical Details](#technical-details)
   - [TAF File Structure](#taf-tonie-audio-format-file-structure)
   - [File Analysis](#file-analysis)
   - [File Comparison](#file-comparison)
 - [Related Projects](#related-projects)
 - [Contributing](#contributing)
+- [Legal Notice](#legal-notice)
 
 ## Overview
 
@@ -42,6 +44,8 @@ The tool provides several capabilities:
 - Compare two TAF files for debugging differences
 - Support various input formats through FFmpeg conversion
 - Extract and use audio media tags (ID3, Vorbis Comments, etc.) for better file naming
+- Upload Tonie files directly to a TeddyCloud server
+- Automatically upload cover artwork alongside Tonie files
 
 ## Requirements
 
@@ -140,7 +144,11 @@ tonietoolbox -h
 
 Output:
 ```
-usage: TonieToolbox.py [-h] [-v] [-t TIMESTAMP] [-f FFMPEG] [-o OPUSENC] 
+usage: TonieToolbox.py [-h] [-v] [--upload URL] [--include-artwork] [--get-tags URL] 
+                    [--ignore-ssl-verify] [--special-folder FOLDER] [--path PATH]
+                    [--show-progress] [--connection-timeout SECONDS]
+                    [--read-timeout SECONDS] [--max-retries RETRIES]
+                    [--retry-delay SECONDS] [-t TIMESTAMP] [-f FFMPEG] [-o OPUSENC]
                     [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
                     [-A] [-k] [-C FILE2] [-D] [-m] [--name-template TEMPLATE]
                     [--show-tags] [-d] [-T] [-q] [-Q]
@@ -151,6 +159,24 @@ Create Tonie compatible file from Ogg opus file(s).
 positional arguments:
   SOURCE                input file or directory or a file list (.lst)
   TARGET                the output file name (default: ---ID---)
+
+TeddyCloud Options:
+  --upload URL          Upload to TeddyCloud instance (e.g., https://teddycloud.example.com). Supports .taf, .jpg, .jpeg, .png files.
+  --include-artwork     Upload cover artwork image alongside the Tonie file when using --upload
+  --get-tags URL        Get available tags from TeddyCloud instance
+  --ignore-ssl-verify   Ignore SSL certificate verification (for self-signed certificates)
+  --special-folder FOLDER
+                        Special folder to upload to (currently only "library" is supported)
+  --path PATH           Path where to write the file on TeddyCloud server
+  --show-progress       Show progress bar during file upload (default: enabled)
+  --connection-timeout SECONDS
+                        Connection timeout in seconds (default: 10)
+  --read-timeout SECONDS
+                        Read timeout in seconds (default: 300)
+  --max-retries RETRIES
+                        Maximum number of retry attempts (default: 3)
+  --retry-delay SECONDS
+                        Delay between retry attempts in seconds (default: 5)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -298,6 +324,65 @@ This will attempt to use the album information from the audio files for naming t
 tonietoolbox --recursive --use-media-tags --name-template "{date} - {album} ({artist})" "Music/Collection/"
 ```
 
+### TeddyCloud Upload
+
+TonieToolbox can upload files directly to a TeddyCloud server, which is an alternative to the official Tonie cloud for managing custom Tonies.
+
+#### Upload a Tonie file to TeddyCloud:
+
+```
+tonietoolbox --upload https://teddycloud.example.com my_tonie.taf
+```
+
+This will upload the specified Tonie file to the TeddyCloud server.
+
+#### Upload a newly created Tonie file:
+
+You can combine conversion and upload in a single command:
+
+```
+tonietoolbox input.mp3 --upload https://teddycloud.example.com
+```
+
+This will convert the input file to TAF format and then upload it to the TeddyCloud server.
+
+#### Upload with custom path:
+
+```
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --path "/custom_audio"
+The path needs to be existing in the TeddyCloud Library.
+```
+
+#### Upload with artwork:
+
+TonieToolbox can automatically find and upload cover artwork alongside your Tonie files:
+
+```
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --include-artwork
+```
+
+This will:
+1. Look for cover images (like "cover.jpg", "artwork.png", etc.) in the source directory
+2. If no cover image is found, attempt to extract embedded artwork from the audio files
+3. Upload the artwork to the "/custom_img" directory on the TeddyCloud server
+4. The artwork will be uploaded with the same filename as the Tonie file for easier association
+
+#### Recursive processing with uploads:
+
+```
+tonietoolbox --recursive "Music/Albums" --upload https://teddycloud.example.com --include-artwork
+```
+
+This will process all folders recursively, create TAF files, and upload both the TAF files and their cover artwork to the TeddyCloud server.
+
+#### Upload with SSL certificate verification disabled:
+
+```
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --ignore-ssl-verify
+```
+
+Use this option if the TeddyCloud server uses a self-signed certificate.
+
 ## Technical Details
 
 ### TAF (Tonie Audio Format) File Structure
@@ -377,3 +462,15 @@ This project is inspired by and builds upon the work of other Tonie-related open
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Legal Notice
+
+This project is an independent, community-driven effort created for educational and personal use purposes.
+
+- tonies®, toniebox®, Hörfigur® are registered trademarks of [tonies GmbH](https://tonies.com).
+- This project is not affiliated with, endorsed by, or connected to tonies GmbH in any way.
+- TonieToolbox is provided "as is" without warranty of any kind, either express or implied.
+- Users are responsible for ensuring their usage complies with all applicable copyright and intellectual property laws.
+- This tool is intended for personal use with legally owned content only.
+
+By using TonieToolbox, you acknowledge that the authors of this software take no responsibility for any potential misuse or any damages that might result from the use of this software.

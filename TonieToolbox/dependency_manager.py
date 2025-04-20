@@ -466,7 +466,7 @@ def ensure_dependency(dependency_name, auto_download=False):
     Returns:
         str: Path to the binary if available, None otherwise
     """
-    logger.info("Ensuring dependency: %s", dependency_name)
+    logger.debug("Ensuring dependency: %s", dependency_name)
     system = get_system()
     
     if system not in ['windows', 'linux', 'darwin']:
@@ -496,7 +496,7 @@ def ensure_dependency(dependency_name, auto_download=False):
             existing_binary = find_binary_in_extracted_dir(dependency_dir, binary_path)
             if existing_binary and os.path.exists(existing_binary):
                 # Verify that the binary works
-                logger.info("Found previously downloaded %s: %s", dependency_name, existing_binary)
+                logger.debug("Found previously downloaded %s: %s", dependency_name, existing_binary)
                 try:
                     if os.access(existing_binary, os.X_OK) or system == 'windows':
                         if system in ['linux', 'darwin']:
@@ -509,14 +509,14 @@ def ensure_dependency(dependency_name, auto_download=False):
                             try:
                                 result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                                 if result.returncode == 0:
-                                    logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                    logger.debug("Using previously downloaded %s: %s", dependency_name, existing_binary)
                                     return existing_binary
                             except:
                                 # If --version fails, try without arguments
                                 try:
                                     result = subprocess.run([existing_binary], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                                     if result.returncode == 0:
-                                        logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                        logger.debug("Using previously downloaded %s: %s", dependency_name, existing_binary)
                                         return existing_binary
                                 except:
                                     pass
@@ -525,7 +525,7 @@ def ensure_dependency(dependency_name, auto_download=False):
                             try:
                                 result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                                 if result.returncode == 0:
-                                    logger.info("Using previously downloaded %s: %s", dependency_name, existing_binary)
+                                    logger.debug("Using previously downloaded %s: %s", dependency_name, existing_binary)
                                     return existing_binary
                             except:
                                 pass

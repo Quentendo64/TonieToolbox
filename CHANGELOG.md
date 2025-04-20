@@ -6,9 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Upload to TeddyCloud Library
+- Creation of tonies.custom.json
 - Download-option with rip
 
+## [0.3.0] - 2025-04-20
+### Added
+- Added a Legal Notice
+- Added `--upload` Implementation of the TeddyCloud Upload Module 
+- Added `--include-artwork` option to automatically upload cover artwork alongside Tonie files
 ## [0.2.3] - 2025-04-20
 ### Added
 - Using media tags for .TAF naming --use-media-tags | --use-media-tags --name-template "{artist} - {album} - {title}"

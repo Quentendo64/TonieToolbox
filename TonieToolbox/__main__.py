@@ -18,13 +18,40 @@ from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
 from .media_tags import is_available as is_media_tags_available, ensure_mutagen
+from .teddycloud import upload_to_teddycloud, get_tags_from_teddycloud, get_file_paths
 
 def main():
     """Entry point for the TonieToolbox application."""
     parser = argparse.ArgumentParser(description='Create Tonie compatible file from Ogg opus file(s).')
     parser.add_argument('-v', '--version', action='version', version=f'TonieToolbox {__version__}',
                         help='show program version and exit')
-    parser.add_argument('input_filename', metavar='SOURCE', type=str, 
+    
+    # TeddyCloud options first to check for existence before requiring SOURCE
+    teddycloud_group = parser.add_argument_group('TeddyCloud Options')
+    teddycloud_group.add_argument('--upload', metavar='URL', action='store',
+                       help='Upload to TeddyCloud instance (e.g., https://teddycloud.example.com). Supports .taf, .jpg, .jpeg, .png files.')
+    teddycloud_group.add_argument('--include-artwork', action='store_true',
+                       help='Upload cover artwork image alongside the Tonie file when using --upload')
+    teddycloud_group.add_argument('--get-tags', action='store', metavar='URL',
+                       help='Get available tags from TeddyCloud instance')
+    teddycloud_group.add_argument('--ignore-ssl-verify', action='store_true',
+                       help='Ignore SSL certificate verification (for self-signed certificates)')
+    teddycloud_group.add_argument('--special-folder', action='store', metavar='FOLDER',
+                       help='Special folder to upload to (currently only "library" is supported)', default='library')
+    teddycloud_group.add_argument('--path', action='store', metavar='PATH',
+                       help='Path where to write the file on TeddyCloud server')
+    teddycloud_group.add_argument('--show-progress', action='store_true', default=True,
+                       help='Show progress bar during file upload (default: enabled)')
+    teddycloud_group.add_argument('--connection-timeout', type=int, metavar='SECONDS', default=10,
+                       help='Connection timeout in seconds (default: 10)')
+    teddycloud_group.add_argument('--read-timeout', type=int, metavar='SECONDS', default=300,
+                       help='Read timeout in seconds (default: 300)')
+    teddycloud_group.add_argument('--max-retries', type=int, metavar='RETRIES', default=3,
+                       help='Maximum number of retry attempts (default: 3)')
+    teddycloud_group.add_argument('--retry-delay', type=int, metavar='SECONDS', default=5,
+                       help='Delay between retry attempts in seconds (default: 5)')
+    
+    parser.add_argument('input_filename', metavar='SOURCE', type=str, nargs='?',
                         help='input file or directory or a file list (.lst)')
     parser.add_argument('output_filename', metavar='TARGET', nargs='?', type=str,
                         help='the output file name (default: ---ID---)')
@@ -79,6 +106,11 @@ def main():
     log_level_group.add_argument('-Q', '--silent', action='store_true', help='Show only errors')
 
     args = parser.parse_args()
+    
+    # Validate that input_filename is provided if not using --get-tags or --upload-existing
+    if args.input_filename is None and not (args.get_tags or args.upload):
+        parser.error("the following arguments are required: SOURCE")
+        
     if args.trace:
         from .logger import TRACE
         log_level = TRACE
@@ -90,11 +122,12 @@ def main():
         log_level = logging.ERROR
     else:
         log_level = logging.INFO
-
+    
     setup_logging(log_level)
     logger = get_logger('main')
     logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
     
+
     if args.clear_version_cache:
         if clear_version_cache():
             logger.info("Version cache cleared successfully")
@@ -110,6 +143,59 @@ def main():
         
         if not is_latest and not update_confirmed and not (args.silent or args.quiet):
             logger.info("Update available but user chose to continue without updating.")
+
+    # Handle get-tags from TeddyCloud if requested
+    if args.get_tags:
+        teddycloud_url = args.get_tags
+        success = get_tags_from_teddycloud(teddycloud_url, args.ignore_ssl_verify)
+        sys.exit(0 if success else 1)
+    
+    # Handle upload to TeddyCloud if requested
+    if args.upload:
+        teddycloud_url = args.upload
+        
+        if not args.input_filename:
+            logger.error("Missing input file for --upload. Provide a file path as SOURCE argument.")
+            sys.exit(1)
+            
+        # Check if the input file is already a .taf file or an image file
+        if os.path.exists(args.input_filename) and (args.input_filename.lower().endswith('.taf') or 
+                                                  args.input_filename.lower().endswith(('.jpg', '.jpeg', '.png'))):
+            # Direct upload of existing TAF or image file
+            # Use get_file_paths to handle Windows backslashes and resolve the paths correctly
+            file_paths = get_file_paths(args.input_filename)
+            
+            if not file_paths:
+                logger.error("No files found for pattern %s", args.input_filename)
+                sys.exit(1)
+                
+            logger.info("Found %d file(s) to upload to TeddyCloud %s", len(file_paths), teddycloud_url)
+            
+            for file_path in file_paths:
+                # Only upload supported file types
+                if not file_path.lower().endswith(('.taf', '.jpg', '.jpeg', '.png')):
+                    logger.warning("Skipping unsupported file type: %s", file_path)
+                    continue
+                    
+                logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
+                upload_success = upload_to_teddycloud(
+                    file_path, teddycloud_url, args.ignore_ssl_verify,
+                    args.special_folder, args.path, args.show_progress,
+                    args.connection_timeout, args.read_timeout,
+                    args.max_retries, args.retry_delay
+                )
+                
+                if not upload_success:
+                    logger.error("Failed to upload %s to TeddyCloud", file_path)
+                    sys.exit(1)
+                else:
+                    logger.info("Successfully uploaded %s to TeddyCloud", file_path)
+            
+            sys.exit(0)
+            
+        # If we get here, it's not a TAF or image file, so continue with normal processing
+        # which will convert the input files and upload the result later
+        pass
 
     ffmpeg_binary = args.ffmpeg
     if ffmpeg_binary is None:
@@ -156,6 +242,7 @@ def main():
             os.makedirs(output_dir, exist_ok=True)
             logger.debug("Created output directory: %s", output_dir)
         
+        created_files = []
         for task_index, (output_name, folder_path, audio_files) in enumerate(process_tasks):
             if args.output_to_source:
                 task_out_filename = os.path.join(folder_path, f"{output_name}.taf")
@@ -169,8 +256,102 @@ def main():
                            args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
                            args.auto_download, not args.use_legacy_tags)
             logger.info("Successfully created Tonie file: %s", task_out_filename)
+            created_files.append(task_out_filename)
             
         logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
+        
+        # Handle upload to TeddyCloud if requested
+        if args.upload and created_files:
+            teddycloud_url = args.upload
+            
+            for taf_file in created_files:
+                upload_success = upload_to_teddycloud(
+                    taf_file, teddycloud_url, args.ignore_ssl_verify,
+                    args.special_folder, args.path, args.show_progress,
+                    args.connection_timeout, args.read_timeout,
+                    args.max_retries, args.retry_delay
+                )
+                
+                if not upload_success:
+                    logger.error("Failed to upload %s to TeddyCloud", taf_file)
+                else:
+                    logger.info("Successfully uploaded %s to TeddyCloud", taf_file)
+                    
+                    # Handle artwork upload if requested
+                    if args.include_artwork:
+                        # Extract folder path from the current task
+                        folder_path = os.path.dirname(taf_file)
+                        taf_file_basename = os.path.basename(taf_file)
+                        taf_name = os.path.splitext(taf_file_basename)[0]  # Get name without extension
+                        logger.info("Looking for artwork for %s", folder_path)
+                        
+                        # Try to find cover image in the folder
+                        from .media_tags import find_cover_image
+                        artwork_path = find_cover_image(folder_path)
+                        temp_artwork = None
+                        
+                        # If no cover image found, try to extract it from one of the audio files
+                        if not artwork_path:
+                            # Get current task's audio files
+                            for task_name, task_folder, task_files in process_tasks:
+                                if task_folder == folder_path or os.path.normpath(task_folder) == os.path.normpath(folder_path):
+                                    if task_files and len(task_files) > 0:
+                                        # Try to extract from first file
+                                        from .media_tags import extract_artwork, ensure_mutagen
+                                        if ensure_mutagen(auto_install=args.auto_download):
+                                            temp_artwork = extract_artwork(task_files[0])
+                                            if temp_artwork:
+                                                artwork_path = temp_artwork
+                                                break
+                        
+                        if artwork_path:
+                            logger.info("Found artwork for %s: %s", folder_path, artwork_path)                    
+                            artwork_upload_path = "/custom_img"                            
+                            artwork_ext = os.path.splitext(artwork_path)[1]
+                            
+                            # Create a temporary copy with the same name as the taf file
+                            import shutil
+                            renamed_artwork_path = None
+                            try:
+                                renamed_artwork_path = os.path.join(os.path.dirname(artwork_path), 
+                                                                  f"{taf_name}{artwork_ext}")
+                                
+                                if renamed_artwork_path != artwork_path:
+                                    shutil.copy2(artwork_path, renamed_artwork_path)
+                                    logger.debug("Created renamed artwork copy: %s", renamed_artwork_path)
+                                
+                                logger.info("Uploading artwork to path: %s as %s%s", 
+                                          artwork_upload_path, taf_name, artwork_ext)
+                                
+                                artwork_upload_success = upload_to_teddycloud(
+                                    renamed_artwork_path, teddycloud_url, args.ignore_ssl_verify,
+                                    args.special_folder, artwork_upload_path, args.show_progress,
+                                    args.connection_timeout, args.read_timeout,
+                                    args.max_retries, args.retry_delay
+                                )
+                                
+                                if artwork_upload_success:
+                                    logger.info("Successfully uploaded artwork for %s", folder_path)
+                                else:
+                                    logger.warning("Failed to upload artwork for %s", folder_path)
+                                    
+                                if renamed_artwork_path != artwork_path and os.path.exists(renamed_artwork_path):
+                                    try:
+                                        os.unlink(renamed_artwork_path)
+                                        logger.debug("Removed temporary renamed artwork file: %s", renamed_artwork_path)
+                                    except Exception as e:
+                                        logger.debug("Failed to remove temporary renamed artwork file: %s", e)
+                                
+                                if temp_artwork and os.path.exists(temp_artwork) and temp_artwork != renamed_artwork_path:
+                                    try:
+                                        os.unlink(temp_artwork)
+                                        logger.debug("Removed temporary artwork file: %s", temp_artwork)
+                                    except Exception as e:
+                                        logger.debug("Failed to remove temporary artwork file: %s", e)
+                            except Exception as e:
+                                logger.error("Error during artwork renaming or upload: %s", e)
+                        else:
+                            logger.warning("No artwork found for %s", folder_path)
         sys.exit(0)
 
     # Handle directory or file input
@@ -214,7 +395,6 @@ def main():
                     print(f"{tag_name}: {tag_value}")
             else:
                 print(f"\nFile {file_index + 1}: {os.path.basename(file_path)} - No tags found")
-        
         sys.exit(0)
         
     # Use media tags for file naming if requested
@@ -324,13 +504,115 @@ def main():
     
     if not out_filename.lower().endswith('.taf'):
         out_filename += '.taf'
-    
+        
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
                      args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
                      args.auto_download, not args.use_legacy_tags)
     logger.info("Successfully created Tonie file: %s", out_filename)
-
+    
+    # Handle upload to TeddyCloud if requested
+    if args.upload:
+        teddycloud_url = args.upload
+        
+        upload_success = upload_to_teddycloud(
+            out_filename, teddycloud_url, args.ignore_ssl_verify,
+            args.special_folder, args.path, args.show_progress,
+            args.connection_timeout, args.read_timeout,
+            args.max_retries, args.retry_delay
+        )
+        if not upload_success:
+            logger.error("Failed to upload %s to TeddyCloud", out_filename)
+            sys.exit(1)
+        else:
+            logger.info("Successfully uploaded %s to TeddyCloud", out_filename)
+            
+            # Handle artwork upload if requested
+            if args.include_artwork:
+                logger.info("Looking for artwork to upload alongside the Tonie file")
+                artwork_path = None
+                
+                # Try to find a cover image in the source directory first
+                source_dir = os.path.dirname(files[0]) if files else None
+                if source_dir:
+                    from .media_tags import find_cover_image
+                    artwork_path = find_cover_image(source_dir)
+                
+                # If no cover in source directory, try to extract it from audio file
+                if not artwork_path and len(files) > 0:
+                    from .media_tags import extract_artwork, ensure_mutagen
+                    
+                    # Make sure mutagen is available for artwork extraction
+                    if ensure_mutagen(auto_install=args.auto_download):
+                        # Try to extract artwork from the first file
+                        temp_artwork = extract_artwork(files[0])
+                        if temp_artwork:
+                            artwork_path = temp_artwork
+                            # Note: this creates a temporary file that will be deleted after upload
+                
+                # Upload the artwork if found
+                if artwork_path:
+                    logger.info("Found artwork: %s", artwork_path)
+                    
+                    # Create artwork upload path - keep same path but use "custom_img" folder
+                    artwork_upload_path = args.path
+                    if not artwork_upload_path:
+                        artwork_upload_path = "/custom_img"
+                    elif not artwork_upload_path.startswith("/custom_img"):
+                        # Make sure we're using the custom_img folder
+                        if artwork_upload_path.startswith("/"):
+                            artwork_upload_path = "/custom_img" + artwork_upload_path
+                        else:
+                            artwork_upload_path = "/custom_img/" + artwork_upload_path
+                    
+                    # Get the original artwork file extension
+                    artwork_ext = os.path.splitext(artwork_path)[1]
+                    
+                    # Create a temporary copy with the same name as the taf file
+                    import shutil
+                    renamed_artwork_path = None
+                    try:
+                        renamed_artwork_path = os.path.join(os.path.dirname(artwork_path), 
+                                                          f"{os.path.splitext(os.path.basename(out_filename))[0]}{artwork_ext}")
+                        
+                        if renamed_artwork_path != artwork_path:
+                            shutil.copy2(artwork_path, renamed_artwork_path)
+                            logger.debug("Created renamed artwork copy: %s", renamed_artwork_path)
+                        
+                        logger.info("Uploading artwork to path: %s as %s%s", 
+                                  artwork_upload_path, os.path.splitext(os.path.basename(out_filename))[0], artwork_ext)
+                        
+                        artwork_upload_success = upload_to_teddycloud(
+                            renamed_artwork_path, teddycloud_url, args.ignore_ssl_verify,
+                            args.special_folder, artwork_upload_path, args.show_progress,
+                            args.connection_timeout, args.read_timeout,
+                            args.max_retries, args.retry_delay
+                        )
+                        
+                        if artwork_upload_success:
+                            logger.info("Successfully uploaded artwork")
+                        else:
+                            logger.warning("Failed to upload artwork")
+                            
+                        # Clean up temporary renamed file
+                        if renamed_artwork_path != artwork_path and os.path.exists(renamed_artwork_path):
+                            try:
+                                os.unlink(renamed_artwork_path)
+                                logger.debug("Removed temporary renamed artwork file: %s", renamed_artwork_path)
+                            except Exception as e:
+                                logger.debug("Failed to remove temporary renamed artwork file: %s", e)
+                        
+                        # Clean up temporary extracted artwork file if needed
+                        if temp_artwork and os.path.exists(temp_artwork) and temp_artwork != renamed_artwork_path:
+                            try:
+                                os.unlink(temp_artwork)
+                                logger.debug("Removed temporary artwork file: %s", temp_artwork)
+                            except Exception as e:
+                                logger.debug("Failed to remove temporary artwork file: %s", e)
+                    except Exception as e:
+                        logger.error("Error during artwork renaming or upload: %s", e)
+                else:
+                    logger.warning("No artwork found to upload")
 
 if __name__ == "__main__":
     main()
