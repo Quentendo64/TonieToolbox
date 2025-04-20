@@ -3,6 +3,9 @@ name: Build and Upload Python Package
 on:
   release:
     types: [created]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -12,10 +15,56 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')" >> $GITHUB_OUTPUT
+      
+      - name: Extract release notes from CHANGELOG.md
+        id: extract_notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Extract the section for this version from CHANGELOG.md
+          # Starting from the line with version header to the next version header or end of file
+          awk -v ver="## [$VERSION]" '
+            BEGIN { found=0; }
+            $0 ~ ver { found=1; print; next; }
+            /^## \[/ { if(found) exit; }
+            found { print; }
+          ' CHANGELOG.md > release_notes.md
+          
+          # Check if we found any content
+          if [ ! -s release_notes.md ]; then
+            echo "No entry found in CHANGELOG.md for version $VERSION"
+            echo "Using default release notes"
+            echo "## Release v$VERSION" > release_notes.md
+            echo "Release v$VERSION" >> release_notes.md
+          fi
+          
+          cat release_notes.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          body_path: release_notes.md
+          generate_release_notes: false
+
   deploy:
+    needs: [create-release]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -29,6 +78,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Set version from tag
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      run: |
+        VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+        sed -i "s/__version__ = .*/__version__ = '$VERSION'/" TonieToolbox/__init__.py
+        echo "Using version: $VERSION from tag"
     
     - name: Set version if provided
       if: github.event.inputs.version != ''
