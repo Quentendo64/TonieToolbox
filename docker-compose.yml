@@ -1,0 +1,15 @@
+services:
+  tonietoolbox:
+    build: .
+    image: tonietoolbox
+    volumes:
+      # Mount the input directory
+      - ./your/local/input:/tonietoolbox/input
+      # Mount the output directory
+      - ./your/local/output:/tonietoolbox/output
+    # Default command will show help
+    command: --help
+    # To override the command, use:
+    # docker-compose run --rm tonietoolbox <your arguments here>
+    # For example:
+    # docker-compose run --rm tonietoolbox -r ./input

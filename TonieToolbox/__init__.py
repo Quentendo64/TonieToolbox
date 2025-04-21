@@ -2,4 +2,4 @@
 TonieToolbox - Convert audio files to Tonie box compatible format
 """
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'

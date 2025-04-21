@@ -23,6 +23,7 @@ classifiers = [
 ]
 dependencies = [
     "protobuf<=3.19.0",
+    "mutagen>=1.47.0"
 ]
 requires-python = ">=3.6"
 

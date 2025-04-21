@@ -15,8 +15,10 @@ A Python tool for converting audio files to Tonie box compatible format (TAF - T
 - [Installation](#installation)
   - [Install from PyPI (Recommended)](#install-from-pypi-recommended)
   - [Install from Source](#install-from-source)
+  - [Using Docker](#using-docker)
 - [Usage](#usage)
   - [Basic Usage](#basic-usage)
+  - [Docker Usage](#docker-usage)
   - [Advanced Options](#advanced-options)
   - [Common Usage Examples](#common-usage-examples)
   - [Media Tags](#media-tags)
@@ -79,6 +81,32 @@ cd TonieToolbox
 pip install protobuf
 ```
 
+### Using Docker
+
+TonieToolbox is available as a Docker image, which comes with all dependencies pre-installed.
+
+#### Pull the Docker Image
+
+```
+# From Docker Hub
+docker pull quentendo64/tonietoolbox:latest
+
+# From GitHub Packages
+docker pull ghcr.io/quentendo64/tonietoolbox:latest
+```
+
+#### Build the Docker Image Locally
+
+```
+docker build -t tonietoolbox .
+```
+
+Or using docker-compose:
+
+```
+docker-compose build
+```
+
 ## Usage
 
 ### Basic Usage
@@ -133,6 +161,41 @@ By default, all generated TAF files are saved in the `.\output` directory. If yo
 
 ```
 tonietoolbox --recursive --output-to-source "Music/Albums"
+```
+
+### Docker Usage
+
+Using TonieToolbox with Docker simplifies the setup process as all dependencies (FFmpeg and opus-tools) are pre-installed.
+
+**Convert a single audio file to Tonie format:**
+
+```bash
+# Use docker run
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+
+# Or using docker-compose
+docker-compose run --rm tonietoolbox input/my-audio-file.mp3
+```
+
+**Process folders recursively:**
+
+```bash
+# Use docker run
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive input/folder
+
+```
+
+**Advanced options with Docker:**
+
+```bash
+# Convert with custom settings
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive --use-media-tags --name-template "{album} - {artist}" --bitrate 128 input/folder
+```
+
+**Upload to TeddyCloud with Docker:**
+
+```bash
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3 --upload https://teddycloud.example.com --include-artwork
 ```
 
 ### Advanced Options
@@ -301,7 +364,7 @@ tonietoolbox --recursive "\Hörspiele\Die drei Fragezeichen\Folgen"
 Process a music collection with nested album folders and save TAF files alongside the source directories:
 
 ```
-tonietoolbox --recursive --output-to-source "\Hörspiele\"
+tonietoolbox --recursive --output-to-source "\Hörspiele\" 
 ```
 
 #### Automatic dependency download:

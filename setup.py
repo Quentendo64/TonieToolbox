@@ -22,7 +22,7 @@ setup(
     version=version,
     author="Quentendo64",
     author_email="quentin@wohlfeil.at",
-    description="Convert audio files to Tonie box compatible format",
+    description="Convert audio files to Toniebox compatible format (.TAF)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Quentendo64/TonieToolbox",
@@ -41,6 +41,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "protobuf<=3.19.0",
+        "mutagen>=1.47.0"
     ],
     entry_points={
         'console_scripts': [

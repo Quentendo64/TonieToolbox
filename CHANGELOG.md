@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Creation of tonies.custom.json
 - Download-option with rip
 
+## [0.4.1] - 2025-04-21
+### Added
+- Added docker setup
+### Fixed
+- Python requirements (mutagen)
 ## [0.4.0] - 2025-04-21
 ### Added
 - Added `--create-custom-json` for creating tonies.custom.json
