@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Creation of tonies.custom.json
 - Download-option with rip
 
+## [0.4.0] - 2025-04-21
+### Added
+- Added `--create-custom-json` for creating tonies.custom.json
+- Added `--log-file` file logging for better support options.
+- Added more debug & trace logging. More logging, more good.
 ## [0.3.0] - 2025-04-20
 ### Added
 - Added a Legal Notice

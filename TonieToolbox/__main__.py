@@ -19,6 +19,7 @@ from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
 from .media_tags import is_available as is_media_tags_available, ensure_mutagen
 from .teddycloud import upload_to_teddycloud, get_tags_from_teddycloud, get_file_paths
+from .tonies_json import fetch_and_update_tonies_json
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -50,7 +51,9 @@ def main():
                        help='Maximum number of retry attempts (default: 3)')
     teddycloud_group.add_argument('--retry-delay', type=int, metavar='SECONDS', default=5,
                        help='Delay between retry attempts in seconds (default: 5)')
-    
+    teddycloud_group.add_argument('--create-custom-json', action='store_true',
+                       help='Fetch and update custom Tonies JSON data')
+
     parser.add_argument('input_filename', metavar='SOURCE', type=str, nargs='?',
                         help='input file or directory or a file list (.lst)')
     parser.add_argument('output_filename', metavar='TARGET', nargs='?', type=str,
@@ -104,6 +107,8 @@ def main():
     log_level_group.add_argument('-T', '--trace', action='store_true', help='Enable trace logging (very verbose)')
     log_level_group.add_argument('-q', '--quiet', action='store_true', help='Show only warnings and errors')
     log_level_group.add_argument('-Q', '--silent', action='store_true', help='Show only errors')
+    log_group.add_argument('--log-file', action='store_true', default=False,
+                       help='Save logs to a timestamped file in .tonietoolbox folder')
 
     args = parser.parse_args()
     
@@ -111,6 +116,7 @@ def main():
     if args.input_filename is None and not (args.get_tags or args.upload):
         parser.error("the following arguments are required: SOURCE")
         
+    # Set up the logging level
     if args.trace:
         from .logger import TRACE
         log_level = TRACE
@@ -123,12 +129,15 @@ def main():
     else:
         log_level = logging.INFO
     
-    setup_logging(log_level)
+    setup_logging(log_level, log_to_file=args.log_file)
     logger = get_logger('main')
     logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
     
+    # Log the command-line arguments at trace level for debugging purposes
+    logger.log(logging.DEBUG - 1, "Command-line arguments: %s", vars(args))
 
     if args.clear_version_cache:
+        logger.log(logging.DEBUG - 1, "Clearing version cache")
         if clear_version_cache():
             logger.info("Version cache cleared successfully")
         else:
@@ -141,18 +150,24 @@ def main():
             force_refresh=args.force_refresh_cache
         )
         
+        logger.log(logging.DEBUG - 1, "Update check results: is_latest=%s, latest_version=%s, update_confirmed=%s", 
+                   is_latest, latest_version, update_confirmed)
+        
         if not is_latest and not update_confirmed and not (args.silent or args.quiet):
             logger.info("Update available but user chose to continue without updating.")
 
     # Handle get-tags from TeddyCloud if requested
     if args.get_tags:
+        logger.debug("Getting tags from TeddyCloud: %s", args.get_tags)
         teddycloud_url = args.get_tags
         success = get_tags_from_teddycloud(teddycloud_url, args.ignore_ssl_verify)
+        logger.log(logging.DEBUG - 1, "Exiting with code %d", 0 if success else 1)
         sys.exit(0 if success else 1)
     
     # Handle upload to TeddyCloud if requested
     if args.upload:
         teddycloud_url = args.upload
+        logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
         
         if not args.input_filename:
             logger.error("Missing input file for --upload. Provide a file path as SOURCE argument.")
@@ -162,6 +177,7 @@ def main():
         if os.path.exists(args.input_filename) and (args.input_filename.lower().endswith('.taf') or 
                                                   args.input_filename.lower().endswith(('.jpg', '.jpeg', '.png'))):
             # Direct upload of existing TAF or image file
+            logger.debug("Direct upload of existing TAF or image file detected")
             # Use get_file_paths to handle Windows backslashes and resolve the paths correctly
             file_paths = get_file_paths(args.input_filename)
             
@@ -191,10 +207,12 @@ def main():
                 else:
                     logger.info("Successfully uploaded %s to TeddyCloud", file_path)
             
+            logger.log(logging.DEBUG - 1, "Exiting after direct upload with code 0")
             sys.exit(0)
             
         # If we get here, it's not a TAF or image file, so continue with normal processing
         # which will convert the input files and upload the result later
+        logger.debug("Input is not a direct upload file, continuing with conversion workflow")
         pass
 
     ffmpeg_binary = args.ffmpeg
@@ -613,6 +631,50 @@ def main():
                         logger.error("Error during artwork renaming or upload: %s", e)
                 else:
                     logger.warning("No artwork found to upload")
+
+    # Handle create-custom-json option
+    if args.create_custom_json and args.upload:
+        teddycloud_url = args.upload
+        artwork_url = None
+        
+        # If artwork was uploaded, construct its URL for the JSON
+        if args.include_artwork:
+            taf_basename = os.path.splitext(os.path.basename(out_filename))[0]
+            artwork_ext = None
+            
+            # Try to determine the artwork extension by checking what was uploaded
+            source_dir = os.path.dirname(files[0]) if files else None
+            if source_dir:
+                from .media_tags import find_cover_image
+                artwork_path = find_cover_image(source_dir)
+                if artwork_path:
+                    artwork_ext = os.path.splitext(artwork_path)[1]
+            
+            # If we couldn't determine extension from a found image, default to .jpg
+            if not artwork_ext:
+                artwork_ext = ".jpg"
+                
+            # Construct the URL for the artwork based on TeddyCloud structure
+            artwork_path = args.path or "/custom_img"
+            if not artwork_path.endswith('/'):
+                artwork_path += '/'
+                
+            artwork_url = f"{teddycloud_url}{artwork_path}{taf_basename}{artwork_ext}"
+            logger.debug("Using artwork URL: %s", artwork_url)
+        
+        logger.info("Fetching and updating custom Tonies JSON data")
+        success = fetch_and_update_tonies_json(
+            teddycloud_url, 
+            args.ignore_ssl_verify,
+            out_filename, 
+            files, 
+            artwork_url
+        )
+        
+        if success:
+            logger.info("Successfully updated custom Tonies JSON data")
+        else:
+            logger.warning("Failed to update custom Tonies JSON data")
 
 if __name__ == "__main__":
     main()

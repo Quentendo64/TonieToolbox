@@ -21,6 +21,7 @@ A Python tool for converting audio files to Tonie box compatible format (TAF - T
   - [Common Usage Examples](#common-usage-examples)
   - [Media Tags](#media-tags)
   - [TeddyCloud Upload](#teddycloud-upload)
+  - [Real-World Use Cases](#real-world-use-cases)
 - [Technical Details](#technical-details)
   - [TAF File Structure](#taf-tonie-audio-format-file-structure)
   - [File Analysis](#file-analysis)
@@ -148,10 +149,10 @@ usage: TonieToolbox.py [-h] [-v] [--upload URL] [--include-artwork] [--get-tags 
                     [--ignore-ssl-verify] [--special-folder FOLDER] [--path PATH]
                     [--show-progress] [--connection-timeout SECONDS]
                     [--read-timeout SECONDS] [--max-retries RETRIES]
-                    [--retry-delay SECONDS] [-t TIMESTAMP] [-f FFMPEG] [-o OPUSENC]
-                    [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
-                    [-A] [-k] [-C FILE2] [-D] [-m] [--name-template TEMPLATE]
-                    [--show-tags] [-d] [-T] [-q] [-Q]
+                    [--retry-delay SECONDS] [--create-custom-json] [-t TIMESTAMP] [-f FFMPEG] 
+                    [-o OPUSENC] [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
+                    [-A] [-k] [-u] [-C FILE2] [-D] [-m] [--name-template TEMPLATE]
+                    [--show-tags] [-S] [-F] [-X] [-d] [-T] [-q] [-Q]
                     SOURCE [TARGET]
 
 Create Tonie compatible file from Ogg opus file(s).
@@ -177,6 +178,7 @@ TeddyCloud Options:
                         Maximum number of retry attempts (default: 3)
   --retry-delay SECONDS
                         Delay between retry attempts in seconds (default: 5)
+  --create-custom-json  Fetch and update custom Tonies JSON data
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -197,10 +199,10 @@ optional arguments:
                         Save output files in the source directory instead of output directory
   -A, --auto-download   Automatically download FFmpeg and opusenc if needed
   -k, --keep-temp       Keep temporary opus files in a temp folder for testing
+  -u, --use-legacy-tags Use legacy hardcoded tags instead of dynamic TonieToolbox tags (DEPRECATED)
   -C, --compare FILE2   Compare input file with another .taf file for debugging
   -D, --detailed-compare
                         Show detailed OGG page differences when comparing files
-
 Media Tag Options:
   -m, --use-media-tags  Use media tags from audio files for naming
   --name-template TEMPLATE
@@ -220,6 +222,7 @@ Logging Options:
   -T, --trace           Enable trace logging (very verbose)
   -q, --quiet           Show only warnings and errors
   -Q, --silent          Show only errors
+  --log-file            Save logs to a timestamped file in .tonietoolbox folder
 ```
 
 ### Common Usage Examples
@@ -264,6 +267,29 @@ tonietoolbox input.mp3 --timestamp ./reference.taf  # Reference TAF for extracti
 tonietoolbox input.mp3 --bitrate 128
 ```
 
+#### Constant bitrate encoding:
+
+For more predictable file sizes and consistent quality, use constant bitrate (CBR) encoding:
+
+```
+# Encode with constant bitrate at 96 kbps (default)
+tonietoolbox input.mp3 --cbr
+
+# Encode with constant bitrate at 128 kbps
+tonietoolbox input.mp3 --cbr --bitrate 128
+```
+
+#### Append Tonie tag:
+
+You can append a hexadecimal tag to the filename, which is useful for organizing Tonie files:
+
+```
+# Add an 8-character hex tag to filename
+tonietoolbox input.mp3 --append-tonie-tag 7F8A6B2E
+
+# The output will be named "input-7F8A6B2E.taf"
+```
+
 #### Process a complex folder structure:
 
 Process an audiobook series with multiple folders:
@@ -276,6 +302,127 @@ Process a music collection with nested album folders and save TAF files alongsid
 
 ```
 tonietoolbox --recursive --output-to-source "\Hörspiele\"
+```
+
+#### Automatic dependency download:
+
+If FFmpeg or opusenc are not found in your PATH, TonieToolbox can automatically download them:
+
+```
+# Automatically download dependencies when needed
+tonietoolbox input.mp3 --auto-download
+
+# Specify custom FFmpeg or opusenc locations
+tonietoolbox input.mp3 --ffmpeg "C:\path\to\ffmpeg.exe" --opusenc "C:\path\to\opusenc.exe"
+```
+
+#### Keep temporary files:
+
+When troubleshooting or debugging, you can keep the temporary opus files:
+
+```
+# Keep temporary opus files in the temp folder
+tonietoolbox input.mp3 --keep-temp
+
+```
+
+#### Working with list files:
+
+Create a text file (.lst) with paths to audio files for batch processing:
+
+```
+# Contents of playlist.lst:
+C:\Music\song1.mp3
+"C:\Music\song2.flac"
+C:\Music\song3.wav
+"C:\Music Path With Spaces\song2.flac"
+
+# Process the list file
+tonietoolbox playlist.lst my_playlist.taf
+```
+
+#### TeddyCloud advanced options:
+
+Customize your TeddyCloud uploads with connection options:
+
+```
+# Upload with custom timeouts and retry parameters
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --connection-timeout 20 --read-timeout 600 --max-retries 5 --retry-delay 10
+
+# Disable progress bar during upload
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --show-progress=False
+
+# Upload to a special folder in TeddyCloud
+tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --special-folder library
+```
+
+#### Get available tags from TeddyCloud:
+
+To see which tags you can use with your TeddyCloud server:
+
+```
+tonietoolbox --get-tags https://teddycloud.example.com
+```
+
+#### Version checking and updates:
+
+TonieToolbox can check for newer versions and notify you when there are updates available:
+
+```
+# Skip checking for updates if you're offline or want faster startup
+tonietoolbox input.mp3 --skip-update-check
+
+# Force refresh of version information from PyPI
+tonietoolbox input.mp3 --force-refresh-cache
+
+# Clear cached version information
+tonietoolbox --clear-version-cache
+```
+
+#### Legacy tag options:
+
+Use legacy hardcoded tags instead of dynamic TonieToolbox tags:
+
+```
+tonietoolbox input.mp3 --use-legacy-tags
+```
+
+#### Create custom JSON data:
+
+When uploading to TeddyCloud, you can also update the custom Tonies JSON data with information about the uploaded file:
+
+```
+tonietoolbox input.mp3 --upload https://teddycloud.example.com --create-custom-json
+```
+
+This will fetch and update the custom Tonies JSON data in the TeddyCloud server with information from your audio files.
+
+#### Logging and Troubleshooting:
+
+Control the verbosity of console output with different logging levels:
+
+```
+# Enable detailed debug information (useful for troubleshooting)
+tonietoolbox input.mp3 --debug
+
+# Enable extremely verbose trace logging (developer level)
+tonietoolbox input.mp3 --trace
+
+# Reduce output to show only warnings and errors
+tonietoolbox input.mp3 --quiet
+
+# Show only critical errors (minimal output)
+tonietoolbox input.mp3 --silent
+```
+
+You can combine logging options with other commands:
+
+```
+# Debug mode while splitting a TAF file
+tonietoolbox --split my_tonie.taf --debug
+
+# Quiet mode while batch processing
+tonietoolbox --recursive "Music/Collection/" --quiet
 ```
 
 ### Media Tags
@@ -382,6 +529,52 @@ tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --ignore-ssl-v
 ```
 
 Use this option if the TeddyCloud server uses a self-signed certificate.
+
+## Real-World Use Cases
+
+### Converting an Audiobook Series
+
+To convert an entire audiobook series with proper metadata and upload to TeddyCloud:
+
+```
+tonietoolbox --recursive --use-media-tags --name-template "{YEAR} - {ALBUMARTIST} - {ALBUM}" --bitrate 128 --upload https://teddycloud.example.com --include-artwork "C:\Hörspiele\Die Drei Fragezeichen"
+```
+
+This command will:
+1. Recursively process the Die Drei Fragezeichen audioplays directory
+2. Use a naming template based on source metadata
+3. Encode at 128 kbps
+4. Upload both audio files and cover art to TeddyCloud
+
+### Creating Children's Story Collections
+
+For a custom children's story collection with chapters:
+
+```
+tonietoolbox story_collection.lst kids_stories.taf --bitrate 96 --cbr --auto-download --use-media-tags --name-template "{title} Stories" --debug
+```
+
+This command:
+1. Processes a list of story audio files
+2. Names the output based on metadata
+3. Uses constant bitrate encoding for consistent quality
+4. Automatically downloads dependencies if needed
+5. Shows detailed debug information during the process
+
+
+### Advanced Media Tag Usage
+
+For complex media tag processing:
+
+```
+# First check available tags
+tonietoolbox --show-tags "C:\Music\Classical\Bach"
+
+# Then use a sophisticated naming template
+tonietoolbox "C:\Music\Classical\Bach" --use-media-tags --name-template "{composer} - {opus} in {key} ({conductor}, {orchestra})"
+```
+
+The first command shows what tags are available, allowing you to create precise naming templates for classical music collections as example.
 
 ## Technical Details
 

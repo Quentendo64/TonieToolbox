@@ -209,12 +209,28 @@ def get_file_tags(file_path: str) -> Dict[str, Any]:
         # Process different file types
         if isinstance(audio, ID3) or hasattr(audio, 'ID3'):
             # MP3 files
-            id3 = audio if isinstance(audio, ID3) else audio.ID3
-            for tag_key, tag_value in id3.items():
-                tag_name = tag_key.split(':')[0]  # Handle ID3 tags with colons
-                if tag_name in TAG_MAPPING:
-                    tag_value_str = str(tag_value)
-                    tags[TAG_MAPPING[tag_name]] = normalize_tag_value(tag_value_str)
+            try:
+                id3 = audio if isinstance(audio, ID3) else audio.ID3
+                for tag_key, tag_value in id3.items():
+                    tag_name = tag_key.split(':')[0]  # Handle ID3 tags with colons
+                    if tag_name in TAG_MAPPING:
+                        tag_value_str = str(tag_value)
+                        tags[TAG_MAPPING[tag_name]] = normalize_tag_value(tag_value_str)
+            except (AttributeError, TypeError) as e:
+                logger.debug("Error accessing ID3 tags: %s", e)
+                # Try alternative approach for ID3 tags
+                try:
+                    if hasattr(audio, 'tags') and audio.tags:
+                        for tag_key in audio.tags.keys():
+                            if tag_key in TAG_MAPPING:
+                                tag_value = audio.tags[tag_key]
+                                if hasattr(tag_value, 'text'):
+                                    tag_value_str = str(tag_value.text[0]) if tag_value.text else ''
+                                else:
+                                    tag_value_str = str(tag_value)
+                                tags[TAG_MAPPING[tag_key]] = normalize_tag_value(tag_value_str)
+                except Exception as e:
+                    logger.debug("Alternative ID3 tag reading failed: %s", e)
         elif isinstance(audio, (FLAC, OggOpus, OggVorbis)):
             # FLAC and OGG files
             for tag_key, tag_values in audio.items():

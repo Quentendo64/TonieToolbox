@@ -54,7 +54,7 @@ def check_identification_header(page):
         page: OggPage to check
         
     Raises:
-        AssertionError: If the header is invalid or unsupported
+        RuntimeError: If the header is invalid or unsupported
     """
     segment = page.segments[0]
     unpacked = struct.unpack("<8sBBHLH", segment.data[0:18])
@@ -62,19 +62,19 @@ def check_identification_header(page):
     
     if unpacked[0] != b"OpusHead":
         logger.error("Invalid opus file: OpusHead signature not found")
-        assert unpacked[0] == b"OpusHead", "Invalid opus file?"
+        raise RuntimeError("Invalid opus file: OpusHead signature not found")
     
     if unpacked[1] != 1:
         logger.error("Invalid opus file: Version mismatch")
-        assert unpacked[1] == 1, "Invalid opus file?"
+        raise RuntimeError("Invalid opus file: Opus version mismatch")
     
     if unpacked[2] != 2:
         logger.error("Only stereo tracks are supported, found channel count: %d", unpacked[2])
-        assert unpacked[2] == 2, "Only stereo tracks are supported"
+        raise RuntimeError(f"Only stereo tracks (2 channels) are supported. Found {unpacked[2]} channel(s). Please convert your audio to stereo format.")
     
     if unpacked[4] != SAMPLE_RATE_KHZ * 1000:
         logger.error("Sample rate needs to be 48 kHz, found: %d Hz", unpacked[4])
-        assert unpacked[4] == SAMPLE_RATE_KHZ * 1000, "Sample rate needs to be 48 kHz"
+        raise RuntimeError(f"Sample rate needs to be 48 kHz. Found {unpacked[4]} Hz.")
     
     logger.debug("Opus identification header is valid")
 
@@ -223,21 +223,26 @@ def skip_first_two_pages(in_file):
         in_file: Input file handle
         
     Raises:
-        RuntimeError: If OGG pages cannot be found
+        RuntimeError: If OGG pages cannot be found or are invalid
     """
     logger.debug("Skipping first two pages")
     found = OggPage.seek_to_page_header(in_file)
     if not found:
         logger.error("First OGG page not found in input file")
-        raise RuntimeError("First ogg page not found")
+        raise RuntimeError("First OGG page not found in input file")
     
-    page = OggPage(in_file)
-    check_identification_header(page)
+    try:
+        page = OggPage(in_file)
+        check_identification_header(page)
+    except RuntimeError as e:
+        # The check_identification_header function already logs errors
+        # Just re-raise with the same message
+        raise RuntimeError(str(e))
 
     found = OggPage.seek_to_page_header(in_file)
     if not found:
         logger.error("Second OGG page not found in input file")
-        raise RuntimeError("Second ogg page not found")
+        raise RuntimeError("Second OGG page not found in input file")
     
     OggPage(in_file)
     logger.debug("First two pages skipped successfully")
@@ -391,6 +396,11 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
     """
     from .audio_conversion import get_opus_tempfile
     
+    logger.trace("Entering create_tonie_file(output_file=%s, input_files=%s, no_tonie_header=%s, user_timestamp=%s, "
+                "bitrate=%d, vbr=%s, ffmpeg_binary=%s, opus_binary=%s, keep_temp=%s, auto_download=%s, use_custom_tags=%s)",
+                output_file, input_files, no_tonie_header, user_timestamp, bitrate, vbr, ffmpeg_binary, 
+                opus_binary, keep_temp, auto_download, use_custom_tags)
+    
     logger.info("Creating Tonie file from %d input files", len(input_files))
     logger.debug("Output file: %s, Bitrate: %d kbps, VBR: %s, No header: %s", 
                 output_file, bitrate, vbr, no_tonie_header)
@@ -473,6 +483,7 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
 
                 logger.debug("Reading remaining pages from file")
                 pages = read_all_remaining_pages(handle)
+                logger.debug("Read %d pages from file", len(pages))
 
                 if template_page is None:
                     template_page = OggPage.from_page(pages[0])
@@ -489,8 +500,10 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
                 logger.debug("Resizing pages for track %d", index + 1)
                 new_pages = resize_pages(pages, max_size, other_size, template_page,
                                         total_granule, next_page_no, last_track)
+                logger.debug("Resized to %d pages for track %d", len(new_pages), index + 1)
 
-                for new_page in new_pages:
+                for i, new_page in enumerate(new_pages):
+                    logger.trace("Writing page %d/%d (page number: %d)", i+1, len(new_pages), new_page.page_no)
                     new_page.write_page(out_file, sha1)
                 
                 last_page = new_pages[len(new_pages) - 1]
@@ -498,11 +511,18 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
                 next_page_no = last_page.page_no + 1
                 logger.debug("Track %d processed, next page no: %d, total granule: %d", 
                             index + 1, next_page_no, total_granule)
+            except Exception as e:
+                logger.error("Error processing file %s: %s", fname, str(e))
+                raise
             finally:
                 handle.close()
 
         if not no_tonie_header:
+            logger.debug("Writing Tonie header")
             fix_tonie_header(out_file, chapters, timestamp, sha1)
             
     if keep_temp and temp_files:
         logger.info("Kept %d temporary opus files in %s", len(temp_files), os.path.dirname(temp_files[0]))
+    
+    logger.trace("Exiting create_tonie_file() successfully")
+    logger.info("Successfully created Tonie file: %s", output_file)

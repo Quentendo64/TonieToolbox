@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
 TeddyCloud API client for TonieToolbox.
-Handles uploading .taf files to a TeddyCloud instance.
+Handles uploading .taf files to a TeddyCloud instance and interacting with the TeddyCloud API.
 """
 
 import os
@@ -453,6 +453,67 @@ class TeddyCloudClient:
             logger.error("Error preparing file for upload: %s", e)
             return False
 
+    def get_tonies_custom_json(self) -> Optional[list]:
+        """
+        Get tonies.custom.json from the TeddyCloud server.
+        
+        Returns:
+            List of custom tonie entries or None if request failed
+        """
+        try:
+            url = f"{self.base_url}/api/toniesCustomJson"
+            logger.info("Loading tonies.custom.json from %s", url)
+            
+            req = urllib.request.Request(url)
+            
+            with self._urlopen(req) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                if isinstance(data, list):
+                    logger.info("Successfully loaded tonies.custom.json with %d entries", len(data))
+                    return data
+                else:
+                    logger.error("Invalid tonies.custom.json format, expected list")
+                    return None
+                
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                logger.info("tonies.custom.json not found on server, starting with empty list")
+                return []
+            else:
+                logger.error("HTTP error loading tonies.custom.json: %s", e)
+                return None
+        except Exception as e:
+            logger.error("Error loading tonies.custom.json: %s", e)
+            return None
+    
+    def put_tonies_custom_json(self, custom_json_data: List[Dict[str, Any]]) -> bool:
+        """
+        Save tonies.custom.json to the TeddyCloud server.
+        
+        Args:
+            custom_json_data: List of custom tonie entries to save
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            url = f"{self.base_url}/api/toniesCustomJson"
+            logger.info("Saving tonies.custom.json to %s", url)
+            
+            data = json.dumps(custom_json_data, indent=2).encode('utf-8')
+            headers = {'Content-Type': 'application/json'}
+            
+            req = urllib.request.Request(url, data=data, headers=headers, method='PUT')
+            
+            with self._urlopen(req) as response:
+                result = response.read().decode('utf-8')
+                logger.info("Successfully saved tonies.custom.json to server")
+                return True
+                
+        except Exception as e:
+            logger.error("Error saving tonies.custom.json to server: %s", e)
+            return False
+
 def upload_to_teddycloud(file_path: str, teddycloud_url: str, ignore_ssl_verify: bool = False, 
                   special_folder: str = None, path: str = None, show_progress: bool = True,
                   connection_timeout: int = DEFAULT_CONNECTION_TIMEOUT, 
@@ -578,3 +639,41 @@ def get_tags_from_teddycloud(teddycloud_url: str, ignore_ssl_verify: bool = Fals
         print("-" * 60)
     
     return True
+
+def get_tonies_custom_json_from_server(teddycloud_url: str, ignore_ssl_verify: bool = False) -> Optional[list]:
+    """
+    Get tonies.custom.json from the TeddyCloud server.
+    
+    Args:
+        teddycloud_url: URL of the TeddyCloud instance
+        ignore_ssl_verify: If True, SSL certificate verification will be disabled
+        
+    Returns:
+        List of custom tonie entries or None if request failed
+    """
+    if not teddycloud_url:
+        logger.error("Cannot load from server: No TeddyCloud URL provided")
+        return None
+        
+    client = TeddyCloudClient(teddycloud_url, ignore_ssl_verify)
+    return client.get_tonies_custom_json()
+
+def put_tonies_custom_json_to_server(teddycloud_url: str, custom_json_data: List[Dict[str, Any]], 
+                                  ignore_ssl_verify: bool = False) -> bool:
+    """
+    Save tonies.custom.json to the TeddyCloud server.
+    
+    Args:
+        teddycloud_url: URL of the TeddyCloud instance
+        custom_json_data: List of custom tonie entries to save
+        ignore_ssl_verify: If True, SSL certificate verification will be disabled
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if not teddycloud_url:
+        logger.error("Cannot save to server: No TeddyCloud URL provided")
+        return False
+        
+    client = TeddyCloudClient(teddycloud_url, ignore_ssl_verify)
+    return client.put_tonies_custom_json(custom_json_data)

@@ -28,6 +28,9 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
     Returns:
         tuple: (file handle, temp_file_path) or (file handle, None) if keep_temp is False
     """
+    logger.trace("Entering get_opus_tempfile(ffmpeg_binary=%s, opus_binary=%s, filename=%s, bitrate=%d, vbr=%s, keep_temp=%s, auto_download=%s)",
+                ffmpeg_binary, opus_binary, filename, bitrate, vbr, keep_temp, auto_download)
+    
     logger.debug("Converting %s to Opus format (bitrate: %d kbps, vbr: %s)", filename, bitrate, vbr)
     
     if ffmpeg_binary is None:
@@ -59,18 +62,19 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         
         logger.debug("Starting FFmpeg process")
         try:
-            ffmpeg_process = subprocess.Popen(
-                [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
-                 "-ar", "48000", "-"], stdout=subprocess.PIPE)
+            ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+            logger.trace("FFmpeg command: %s", ffmpeg_cmd)
+            ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
         except FileNotFoundError:
             logger.error("Error opening input file %s", filename)
             raise RuntimeError(f"Error opening input file {filename}")
              
         logger.debug("Starting opusenc process")
         try:
+            opusenc_cmd = [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", temp_path]
+            logger.trace("Opusenc command: %s", opusenc_cmd)
             opusenc_process = subprocess.Popen(
-                [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", temp_path],
-                stdin=ffmpeg_process.stdout, stderr=subprocess.DEVNULL)
+                opusenc_cmd, stdin=ffmpeg_process.stdout, stderr=subprocess.DEVNULL)
         except Exception as e:
             logger.error("Opus encoding failed: %s", str(e))
             raise RuntimeError(f"Opus encoding failed: {str(e)}")
@@ -78,6 +82,8 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         ffmpeg_process.stdout.close()  # Allow ffmpeg to receive SIGPIPE if opusenc exits
         opusenc_return = opusenc_process.wait()
         ffmpeg_return = ffmpeg_process.wait()
+        
+        logger.debug("Process return codes - FFmpeg: %d, Opus: %d", ffmpeg_return, opusenc_return)
         
         if ffmpeg_return != 0:
             logger.error("FFmpeg processing failed with return code %d", ffmpeg_return)
@@ -87,9 +93,10 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
             logger.error("Opus encoding failed with return code %d", opusenc_return)
             raise RuntimeError(f"Opus encoding failed with return code {opusenc_return}")
         
-        logger.debug("Opening temporary file for reading")
+        logger.debug("Opening temporary file for reading: %s", temp_path)
         try:
             tmp_file = open(temp_path, "rb")
+            logger.trace("Exiting get_opus_tempfile() with persistent temporary file")
             return tmp_file, temp_path
         except Exception as e:
             logger.error("Failed to open temporary file: %s", str(e))
@@ -99,18 +106,19 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         
         logger.debug("Starting FFmpeg process")
         try:
-            ffmpeg_process = subprocess.Popen(
-                [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav",
-                 "-ar", "48000", "-"], stdout=subprocess.PIPE)
+            ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+            logger.trace("FFmpeg command: %s", ffmpeg_cmd)
+            ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
         except FileNotFoundError:
             logger.error("Error opening input file %s", filename)
             raise RuntimeError(f"Error opening input file {filename}")
              
         logger.debug("Starting opusenc process")
         try:
+            opusenc_cmd = [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", "-"]
+            logger.trace("Opusenc command: %s", opusenc_cmd)
             opusenc_process = subprocess.Popen(
-                [opus_binary, "--quiet", vbr_parameter, "--bitrate", f"{bitrate:d}", "-", "-"],
-                stdin=ffmpeg_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                opusenc_cmd, stdin=ffmpeg_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         except Exception as e:
             logger.error("Opus encoding failed: %s", str(e))
             raise RuntimeError(f"Opus encoding failed: {str(e)}")
@@ -124,9 +132,13 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         for chunk in iter(lambda: opusenc_process.stdout.read(4096), b""):
             tmp_file.write(chunk)
             bytes_written += len(chunk)
+            if bytes_written % (1024 * 1024) == 0:  # Log every 1MB
+                logger.trace("Written %d bytes so far", bytes_written)
         
         opusenc_return = opusenc_process.wait()
         ffmpeg_return = ffmpeg_process.wait()
+        
+        logger.debug("Process return codes - FFmpeg: %d, Opus: %d", ffmpeg_return, opusenc_return)
         
         if ffmpeg_return != 0:
             logger.error("FFmpeg processing failed with return code %d", ffmpeg_return)
@@ -139,6 +151,7 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         logger.debug("Wrote %d bytes to temporary file", bytes_written)
         tmp_file.seek(0)
         
+        logger.trace("Exiting get_opus_tempfile() with in-memory temporary file")
         return tmp_file, None
 
 
@@ -152,6 +165,7 @@ def filter_directories(glob_list):
     Returns:
         list: Filtered list containing only supported audio files
     """
+    logger.trace("Entering filter_directories() with %d items", len(glob_list))
     logger.debug("Filtering %d glob results for supported audio files", len(glob_list))
     
     # Common audio file extensions supported by ffmpeg
@@ -171,6 +185,7 @@ def filter_directories(glob_list):
                 logger.trace("Skipping unsupported file: %s", name)
     
     logger.debug("Found %d supported audio files after filtering", len(filtered))
+    logger.trace("Exiting filter_directories() with %d files", len(filtered))
     return filtered
 
 
@@ -186,6 +201,7 @@ def get_input_files(input_filename):
     Returns:
         list: List of input file paths
     """
+    logger.trace("Entering get_input_files(input_filename=%s)", input_filename)
     logger.debug("Getting input files for pattern: %s", input_filename)
     
     if input_filename.endswith(".lst"):
@@ -196,6 +212,7 @@ def get_input_files(input_filename):
             for line_num, line in enumerate(file_list, 1):
                 fname = line.strip()
                 if not fname or fname.startswith('#'):  # Skip empty lines and comments
+                    logger.trace("Skipping empty line or comment at line %d", line_num)
                     continue
                 
                 # Remove any quote characters from path
@@ -204,10 +221,10 @@ def get_input_files(input_filename):
                 # Check if the path is absolute or has a drive letter (Windows)
                 if os.path.isabs(fname) or (len(fname) > 1 and fname[1] == ':'):
                     full_path = fname  # Use as is if it's an absolute path
-                    logger.trace("Using absolute path from list: %s", full_path)
+                    logger.trace("Using absolute path from line %d: %s", line_num, full_path)
                 else:
                     full_path = os.path.join(list_dir, fname)
-                    logger.trace("Using relative path from list: %s", full_path)
+                    logger.trace("Using relative path from line %d: %s -> %s", line_num, fname, full_path)
                 
                 # Handle directory paths by finding all audio files in the directory
                 if os.path.isdir(full_path):
@@ -216,11 +233,12 @@ def get_input_files(input_filename):
                     dir_files = sorted(filter_directories(glob.glob(dir_glob)))
                     if dir_files:
                         input_files.extend(dir_files)
-                        logger.debug("Found %d audio files in directory", len(dir_files))
+                        logger.debug("Found %d audio files in directory from line %d", len(dir_files), line_num)
                     else:
                         logger.warning("No audio files found in directory at line %d: %s", line_num, full_path)
                 elif os.path.isfile(full_path):
                     input_files.append(full_path)
+                    logger.trace("Added file from line %d: %s", line_num, full_path)
                 else:
                     logger.warning("File not found at line %d: %s", line_num, full_path)
         
@@ -230,6 +248,7 @@ def get_input_files(input_filename):
         input_files = sorted(filter_directories(glob.glob(input_filename)))
         logger.debug("Found %d files matching pattern", len(input_files))
     
+    logger.trace("Exiting get_input_files() with %d files", len(input_files))
     return input_files
 
 
@@ -244,13 +263,16 @@ def append_to_filename(output_filename, tag):
     Returns:
         str: Modified filename with tag
     """
+    logger.trace("Entering append_to_filename(output_filename=%s, tag=%s)", output_filename, tag)
     logger.debug("Appending tag '%s' to filename: %s", tag, output_filename)
     pos = output_filename.rfind('.')
     if pos == -1:
         result = f"{output_filename}_{tag}"
         logger.debug("No extension found, result: %s", result)
+        logger.trace("Exiting append_to_filename() with result=%s", result)
         return result
     else:
         result = f"{output_filename[:pos]}_{tag}{output_filename[pos:]}"
         logger.debug("Extension found, result: %s", result)
+        logger.trace("Exiting append_to_filename() with result=%s", result)
         return result
