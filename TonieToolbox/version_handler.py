@@ -3,9 +3,9 @@ Version handler to check if the latest version of TonieToolbox is being used.
 """
 
 import json
-import logging
 import os
 import time
+from packaging import version
 from urllib import request
 from urllib.error import URLError
 
@@ -90,7 +90,7 @@ def get_pypi_version(force_refresh=False):
 
 def compare_versions(v1, v2):
     """
-    Compare two version strings.
+    Compare two version strings according to PEP 440.
     
     Args:
         v1: First version string
@@ -102,31 +102,35 @@ def compare_versions(v1, v2):
     logger = get_logger("version_handler")
     logger.debug("Comparing versions: '%s' vs '%s'", v1, v2)
     
-    try:
-        v1_parts = [int(x) for x in v1.split('.')]
-        v2_parts = [int(x) for x in v2.split('.')]
+    try:   
+        # Strip leading 'v' if present
+        v1_clean = v1[1:] if v1.startswith('v') else v1
+        v2_clean = v2[1:] if v2.startswith('v') else v2
         
-        logger.debug("Version parts: %s vs %s", v1_parts, v2_parts)
+        parsed_v1 = version.parse(v1_clean)
+        parsed_v2 = version.parse(v2_clean)
         
-        for i in range(max(len(v1_parts), len(v2_parts))):
-            v1_part = v1_parts[i] if i < len(v1_parts) else 0
-            v2_part = v2_parts[i] if i < len(v2_parts) else 0
-            
-            logger.debug("Comparing part %d: %d vs %d", i, v1_part, v2_part)
-            
-            if v1_part < v2_part:
-                logger.debug("Result: '%s' is OLDER than '%s'", v1, v2)
-                return -1
-            elif v1_part > v2_part:
-                logger.debug("Result: '%s' is NEWER than '%s'", v1, v2)
-                return 1
+        logger.debug("Parsed versions: %s vs %s", parsed_v1, parsed_v2)
         
-        logger.debug("Result: versions are EQUAL")
-        return 0
+        if parsed_v1 < parsed_v2:
+            logger.debug("Result: '%s' is OLDER than '%s'", v1, v2)
+            return -1
+        elif parsed_v1 > parsed_v2:
+            logger.debug("Result: '%s' is NEWER than '%s'", v1, v2)
+            return 1
+        else:
+            logger.debug("Result: versions are EQUAL")
+            return 0
     except Exception as e:
         logger.debug("Error comparing versions '%s' and '%s': %s", v1, v2, e)
-        # On error, assume versions are equal
-        return 0
+        # On error, fall back to simple string comparison to avoid crashes
+        logger.debug("Falling back to string comparison")
+        if v1 == v2:
+            return 0
+        elif v1 < v2:
+            return -1
+        else:
+            return 1
 
 
 def check_for_updates(quiet=False, force_refresh=False):

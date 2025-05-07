@@ -6,18 +6,11 @@ import datetime
 import hashlib
 import struct
 import os
-import difflib
-from collections import defaultdict
-
 from  . import tonie_header_pb2
-
 from .ogg_page import OggPage
 from .logger import get_logger
 
-# Setup logging
 logger = get_logger('tonie_analysis')
-
-
 def format_time(ts):
     """
     Format a timestamp as a human-readable date and time string.
@@ -28,7 +21,7 @@ def format_time(ts):
     Returns:
         str: Formatted date and time string
     """
-    return datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 
 def format_hex(data):
@@ -112,8 +105,6 @@ def get_header_info(in_file):
     
     logger.debug("Opus header found: %s, Version: %d, Channels: %d, Sample rate: %d Hz, Serial: %d", 
                 opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no)
-
-    # Read and parse Opus comments from the second page
     opus_comments = {}
     found = OggPage.seek_to_page_header(in_file)
     if not found:
@@ -124,7 +115,6 @@ def get_header_info(in_file):
     logger.debug("Read second OGG page")
     
     try:
-        # Combine all segments data for the second page
         comment_data = bytearray()
         for segment in second_page.segments:
             comment_data.extend(segment.data)
@@ -461,7 +451,6 @@ def compare_taf_files(file1, file2, detailed=False):
     
     differences = []
     
-    # Compare headers and extract key information
     with open(file1, "rb") as f1, open(file2, "rb") as f2:
         # Read and compare header sizes
         header_size1 = struct.unpack(">L", f1.read(4))[0]
@@ -582,3 +571,174 @@ def compare_taf_files(file1, file2, detailed=False):
         print("\nFiles are equivalent")
         logger.info("Files comparison result: Equivalent")
         return True
+
+def get_header_info_cli(in_file):
+    """
+    Get header information from a Tonie file.
+    
+    Args:
+        in_file: Input file handle
+        
+    Returns:
+        tuple: Header size, Tonie header object, file size, audio size, SHA1 sum,
+               Opus header found flag, Opus version, channel count, sample rate, bitstream serial number,
+               Opus comments dictionary, valid flag
+               
+    Note:
+        Instead of raising exceptions, this function returns default values and a valid flag
+    """
+    logger.debug("Reading Tonie header information")
+    
+    try:
+        tonie_header = tonie_header_pb2.TonieHeader()
+        header_size = struct.unpack(">L", in_file.read(4))[0]
+        logger.debug("Header size: %d bytes", header_size)
+        
+        tonie_header = tonie_header.FromString(in_file.read(header_size))
+        logger.debug("Read Tonie header with %d chapter pages", len(tonie_header.chapterPages))
+
+        sha1sum = hashlib.sha1(in_file.read())
+        logger.debug("Calculated SHA1: %s", sha1sum.hexdigest())
+
+        file_size = in_file.tell()
+        in_file.seek(4 + header_size)
+        audio_size = file_size - in_file.tell()
+        logger.debug("File size: %d bytes, Audio size: %d bytes", file_size, audio_size)
+
+        found = OggPage.seek_to_page_header(in_file)
+        if not found:
+            logger.error("First OGG page not found")
+            return (header_size, tonie_header, file_size, audio_size, sha1sum,
+                    False, 0, 0, 0, 0, {}, False)
+        
+        first_page = OggPage(in_file)
+        logger.debug("Read first OGG page")
+
+        unpacked = struct.unpack("<8sBBHLH", first_page.segments[0].data[0:18])
+        opus_head_found = unpacked[0] == b"OpusHead"
+        opus_version = unpacked[1]
+        channel_count = unpacked[2]
+        sample_rate = unpacked[4]
+        bitstream_serial_no = first_page.serial_no
+        
+        logger.debug("Opus header found: %s, Version: %d, Channels: %d, Sample rate: %d Hz, Serial: %d", 
+                    opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no)
+        opus_comments = {}
+        found = OggPage.seek_to_page_header(in_file)
+        if not found:
+            logger.error("Second OGG page not found")
+            return (header_size, tonie_header, file_size, audio_size, sha1sum,
+                   opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no, {}, False)
+        
+        second_page = OggPage(in_file)
+        logger.debug("Read second OGG page")
+        
+        try:
+            comment_data = bytearray()
+            for segment in second_page.segments:
+                comment_data.extend(segment.data)
+            
+            if comment_data.startswith(b"OpusTags"):
+                pos = 8  # Skip "OpusTags"
+                # Extract vendor string
+                if pos + 4 <= len(comment_data):
+                    vendor_length = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                    pos += 4
+                    if pos + vendor_length <= len(comment_data):
+                        vendor = comment_data[pos:pos+vendor_length].decode('utf-8', errors='replace')
+                        opus_comments["vendor"] = vendor
+                        pos += vendor_length
+                        
+                        # Extract comments count
+                        if pos + 4 <= len(comment_data):
+                            comments_count = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                            pos += 4
+                            
+                            # Extract individual comments
+                            for i in range(comments_count):
+                                if pos + 4 <= len(comment_data):
+                                    comment_length = struct.unpack("<I", comment_data[pos:pos+4])[0]
+                                    pos += 4
+                                    if pos + comment_length <= len(comment_data):
+                                        comment = comment_data[pos:pos+comment_length].decode('utf-8', errors='replace')
+                                        pos += comment_length
+                                        
+                                        # Split comment into key/value if possible
+                                        if "=" in comment:
+                                            key, value = comment.split("=", 1)
+                                            opus_comments[key] = value
+                                        else:
+                                            opus_comments[f"comment_{i}"] = comment
+                                    else:
+                                        break
+                                else:
+                                    break
+        except Exception as e:
+            logger.error("Failed to parse Opus comments: %s", str(e))
+
+        return (
+            header_size, tonie_header, file_size, audio_size, sha1sum,
+            opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no,
+            opus_comments, True
+        )
+    except Exception as e:
+        logger.error("Error processing Tonie file: %s", str(e))
+        # Return default values with valid=False
+        return (0, tonie_header_pb2.TonieHeader(), 0, 0, None, False, 0, 0, 0, 0, {}, False)
+
+
+def check_tonie_file_cli(filename):
+    """
+    Check if a file is a valid Tonie file
+    
+    Args:
+        filename: Path to the file to check
+        
+    Returns:
+        bool: True if the file is valid, False otherwise
+    """
+    logger.info("Checking Tonie file: %s", filename)
+    
+    try:
+        with open(filename, "rb") as in_file:
+            header_size, tonie_header, file_size, audio_size, sha1, opus_head_found, \
+            opus_version, channel_count, sample_rate, bitstream_serial_no, opus_comments, valid = get_header_info_cli(in_file)
+
+            if not valid:
+                logger.error("Invalid Tonie file: %s", filename)
+                return False
+
+            try:
+                page_count, alignment_okay, page_size_okay, total_time, \
+                chapters = get_audio_info(in_file, sample_rate, tonie_header, header_size)
+            except Exception as e:
+                logger.error("Error analyzing audio data: %s", str(e))
+                return False
+
+        hash_ok = tonie_header.dataHash == sha1.digest()
+        timestamp_ok = tonie_header.timestamp == bitstream_serial_no
+        audio_size_ok = tonie_header.dataLength == audio_size
+        opus_ok = opus_head_found and \
+                opus_version == 1 and \
+                (sample_rate == 48000 or sample_rate == 44100) and \
+                channel_count == 2
+
+        all_ok = hash_ok and \
+                timestamp_ok and \
+                opus_ok and \
+                alignment_okay and \
+                page_size_okay
+
+        logger.debug("Validation results:")
+        logger.debug("  Hash OK: %s", hash_ok)
+        logger.debug("  Timestamp OK: %s", timestamp_ok)
+        logger.debug("  Audio size OK: %s", audio_size_ok)
+        logger.debug("  Opus OK: %s", opus_ok)
+        logger.debug("  Alignment OK: %s", alignment_okay)
+        logger.debug("  Page size OK: %s", page_size_okay)
+        logger.debug("  All OK: %s", all_ok)
+
+        return all_ok
+    except Exception as e:
+        logger.error("Error checking Tonie file: %s", str(e))
+        return False

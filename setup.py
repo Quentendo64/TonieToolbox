@@ -6,14 +6,11 @@ Setup script for TonieToolbox.
 import os
 from setuptools import setup, find_packages
 
-# Read version from __init__.py
 with open(os.path.join('TonieToolbox', '__init__.py'), 'r') as f:
     for line in f:
         if line.startswith('__version__'):
             version = line.split('=')[1].strip().strip("'\"")
             break
-
-# Read long description from README.md
 with open('README.md', 'r', encoding='utf-8') as f:
     long_description = f.read()
 
