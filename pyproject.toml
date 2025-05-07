@@ -1,18 +1,17 @@
 [build-system]
-requires = ["setuptools>=42"]
+requires = ["setuptools>=80.3.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "TonieToolbox"
+dynamic = ["version"]
 description = "Create files for the Tonie box and interact with TeddyCloud servers"
 readme = "README.md"
 requires-python = ">=3.7"
-license = {file = "LICENSE.md"}
-dynamic = ["version"]
+license = "GPL-3.0-or-later"
 authors = [
     {name = "Quentendo64", email = "quentin@wohlfeil.at"}
 ]
-license = "GPL-3.0-or-later"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.6",
@@ -26,7 +25,8 @@ classifiers = [
 dependencies = [
     "protobuf<=3.19.0",
     "requests>=2.32.3",
-    "mutagen>=1.47.0"
+    "mutagen>=1.47.0",
+    "packaging>=25.0"
 ]
 
 [project.optional-dependencies]
@@ -34,24 +34,10 @@ test = [
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
 ]
-dev = [
-    "pylint>=3.3.7",
-    "black>=25.1.0",
-    "isort>=6.0.1",
-    "mypy>=1.15.0",
-    "pytest>=8.3.5",
-    "pytest-cov>=6.1.1",
-    "twine>=6.1.0",
-]
-tags = [
-    "mutagen>=1.47.0",
-]
+
+[project.urls]
+Homepage = "https://github.com/Quentendo64/TonieToolbox"
+"Bug Tracker" = "https://github.com/Quentendo64/TonieToolbox/issues"
 
 [project.scripts]
 tonietoolbox = "TonieToolbox.__main__:main"
-
-[tool.setuptools]
-packages = ["TonieToolbox"]
-
-[tool.setuptools.dynamic]
-version = {attr = "TonieToolbox.__version__"}

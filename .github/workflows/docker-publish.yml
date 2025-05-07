@@ -82,6 +82,9 @@ jobs:
             type=semver,pattern={{major}},value=${{ steps.extract_version.outputs.VERSION }}
             type=ref,event=branch
             type=sha,format=long
+            type=raw,value=alpha,enable=${{ contains(steps.extract_version.outputs.VERSION, 'a') }}
+            type=raw,value=beta,enable=${{ contains(steps.extract_version.outputs.VERSION, 'b') }}
+            type=raw,value=rc,enable=${{ contains(steps.extract_version.outputs.VERSION, 'rc') }}
 
       - name: Build and push Docker image
         id: build-and-push

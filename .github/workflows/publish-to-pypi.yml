@@ -86,8 +86,19 @@ jobs:
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
       run: |
         VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+        # Validate the version format according to PEP 440
+        if ! python -c "from packaging import version; version.parse('$VERSION')" &> /dev/null; then
+          echo "::error::Invalid version format: $VERSION. Must comply with PEP 440."
+          exit 1
+        fi
         sed -i "s/__version__ = .*/__version__ = '$VERSION'/" TonieToolbox/__init__.py
-        echo "Using version: $VERSION from tag"
+        # Determine if this is a pre-release version
+        if [[ "$VERSION" == *"a"* || "$VERSION" == *"b"* || "$VERSION" == *"rc"* ]]; then
+          echo "PRERELEASE=true" >> $GITHUB_ENV
+        else
+          echo "PRERELEASE=false" >> $GITHUB_ENV
+        fi
+        echo "Using version: $VERSION from tag (prerelease: $PRERELEASE)"
     
     - name: Set version if provided
       if: github.event.inputs.version != ''

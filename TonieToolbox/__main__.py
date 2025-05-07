@@ -7,7 +7,6 @@ import argparse
 import os
 import sys
 import logging
-
 from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
