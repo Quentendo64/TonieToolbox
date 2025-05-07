@@ -12,7 +12,7 @@ import requests
 from .logger import get_logger
 logger = get_logger('teddycloud')
 DEFAULT_CONNECTION_TIMEOUT = 10
-DEFAULT_READ_TIMEOUT = 300  # 5 minutes
+DEFAULT_READ_TIMEOUT = 15  # seconds
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 5  # seconds
 

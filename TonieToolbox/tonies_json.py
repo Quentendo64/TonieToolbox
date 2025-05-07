@@ -351,39 +351,85 @@ def fetch_and_update_tonies_json(client: TeddyCloudClient, taf_file: Optional[st
     Returns:
         True if successful, False otherwise
     """
+    logger.trace("Entering fetch_and_update_tonies_json with client=%s, taf_file=%s, input_files=%s, artwork_url=%s, output_dir=%s",
+                client, taf_file, input_files, artwork_url, output_dir)
+    
     handler = ToniesJsonHandler(client)
     if not output_dir:
         output_dir = './output'
+        logger.debug("No output directory specified, using default: %s", output_dir)
+    
     os.makedirs(output_dir, exist_ok=True)
+    logger.debug("Ensuring output directory exists: %s", output_dir)
+    
     json_file_path = os.path.join(output_dir, 'tonies.custom.json')
+    logger.debug("JSON file path: %s", json_file_path)
+    
     loaded_from_server = False
     if client:
         logger.info("Attempting to load tonies.custom.json from server")
         loaded_from_server = handler.load_from_server()
+        logger.debug("Load from server result: %s", "success" if loaded_from_server else "failed")
+    else:
+        logger.debug("No client provided, skipping server load")
+    
     if os.path.exists(json_file_path):
         logger.info("Local tonies.custom.json file found, merging with server content")
+        logger.debug("Local file exists at %s, size: %d bytes", json_file_path, os.path.getsize(json_file_path))
+        
         local_handler = ToniesJsonHandler()
         if local_handler.load_from_file(json_file_path):
+            logger.debug("Successfully loaded local file with %d entries", len(local_handler.custom_json))
+            
             if loaded_from_server:
+                logger.debug("Merging local entries with server entries")
                 server_article_ids = {entry.get('article') for entry in handler.custom_json}
+                logger.debug("Found %d unique article IDs from server", len(server_article_ids))
+                
+                added_count = 0
                 for local_entry in local_handler.custom_json:
                     local_article_id = local_entry.get('article')
                     if local_article_id not in server_article_ids:
-                        logger.info(f"Adding local-only entry {local_article_id} to merged content")
+                        logger.trace("Adding local-only entry %s to merged content", local_article_id)
                         handler.custom_json.append(local_entry)
+                        added_count += 1
+                
+                logger.debug("Added %d local-only entries to merged content", added_count)
             else:
+                logger.debug("Using only local entries (server load failed or no client)")
                 handler.custom_json = local_handler.custom_json
                 handler.is_loaded = True
                 logger.info("Using local tonies.custom.json content")
     elif not loaded_from_server:
+        logger.debug("No local file found and server load failed, starting with empty list")
         handler.custom_json = []
         handler.is_loaded = True
         logger.info("No tonies.custom.json found, starting with empty list")
+    
     if taf_file and input_files and handler.is_loaded:
+        logger.debug("Adding new entry for TAF file: %s", taf_file)
+        logger.debug("Using %d input files for metadata extraction", len(input_files))
+        
         if not handler.add_entry_from_taf(taf_file, input_files, artwork_url):
             logger.error("Failed to add entry to tonies.custom.json")
+            logger.trace("Exiting fetch_and_update_tonies_json with success=False (failed to add entry)")
             return False
+        
+        logger.debug("Successfully added new entry for %s", taf_file)
+    else:
+        if not taf_file:
+            logger.debug("No TAF file provided, skipping add entry step")
+        elif not input_files:
+            logger.debug("No input files provided, skipping add entry step")
+        elif not handler.is_loaded:
+            logger.debug("Handler not properly loaded, skipping add entry step")
+    
+    logger.debug("Saving updated tonies.custom.json to %s", json_file_path)
     if not handler.save_to_file(json_file_path):
         logger.error("Failed to save tonies.custom.json to file")
+        logger.trace("Exiting fetch_and_update_tonies_json with success=False (failed to save file)")
         return False
+    
+    logger.debug("Successfully saved tonies.custom.json with %d entries", len(handler.custom_json))
+    logger.trace("Exiting fetch_and_update_tonies_json with success=True")
     return True
