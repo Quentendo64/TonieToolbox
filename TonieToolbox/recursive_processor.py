@@ -290,20 +290,26 @@ def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False
     return output_name
 
 
-def process_recursive_folders(root_path: str, use_media_tags: bool = False, 
-                            name_template: str = None) -> List[Tuple[str, str, List[str]]]:
+def process_recursive_folders(root_path, use_media_tags=False, name_template=None):
     """
-    Process folders recursively and prepare data for conversion.
+    Process folders recursively for audio files to create Tonie files.
     
     Args:
-        root_path: Root directory to start processing from
-        use_media_tags: Whether to use media tags from audio files for naming
-        name_template: Optional template for formatting output names using media tags
-        
+        root_path (str): The root path to start processing from
+        use_media_tags (bool): Whether to use media tags for naming
+        name_template (str): Template for naming files using media tags
+    
     Returns:
-        List of tuples: (output_filename, folder_path, list_of_audio_files)
+        list: A list of tuples (output_name, folder_path, audio_files)
     """
+    logger = get_logger("recursive_processor")
     logger.info("Processing folders recursively: %s", root_path)
+    # Make sure the path exists
+    if not os.path.exists(root_path):
+        logger.error("Path does not exist: %s", root_path)
+        return []
+    
+    logger.info("Finding folders with audio files in: %s", root_path)
     
     # Get folder info with hierarchy details
     all_folders = find_audio_folders(root_path)

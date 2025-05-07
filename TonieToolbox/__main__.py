@@ -7,19 +7,17 @@ import argparse
 import os
 import sys
 import logging
-import tempfile
-import shutil
 
 from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
-from .tonie_analysis import check_tonie_file, split_to_opus_files
+from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary
 from .logger import setup_logging, get_logger
 from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
-from .media_tags import is_available as is_media_tags_available, ensure_mutagen
+from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json
@@ -88,6 +86,8 @@ def main():
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
     parser.add_argument('-O', '--output-to-source', action='store_true', 
                         help='Save output files in the source directory instead of output directory')
+    parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
+                        help='Force creation of Tonie file even if it already exists')
     # ------------- Parser - Debug TAFs -------------
     parser.add_argument('-k', '--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
@@ -143,11 +143,11 @@ def main():
     setup_logging(log_level, log_to_file=args.log_file)
     logger = get_logger('main')
     logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
-    logger.debug( "Command-line arguments: %s", vars(args))
+    logger.debug("Command-line arguments: %s", vars(args))
 
     # ------------- Version handling -------------
     if args.clear_version_cache:
-        logger.debug( "Clearing version cache")
+        logger.debug("Clearing version cache")
         if clear_version_cache():
             logger.info("Version cache cleared successfully")
         else:
@@ -166,6 +166,17 @@ def main():
         if not is_latest and not update_confirmed and not (args.silent or args.quiet):
             logger.info("Update available but user chose to continue without updating.")
 
+        # ------------- Normalize Path Input -------------
+    if args.input_filename:
+        logger.debug("Original input path: %s", args.input_filename)
+        # Strip quotes from the beginning and end
+        args.input_filename = args.input_filename.strip('"\'')
+        # Handle paths that end with a backslash
+        if args.input_filename.endswith('\\'):
+            args.input_filename = args.input_filename.rstrip('\\')
+        logger.debug("Normalized input path: %s", args.input_filename)
+
+        # ------------- Setup TeddyCloudClient-------------
     if args.upload or args.get_tags:
         if args.upload:
             teddycloud_url = args.upload
@@ -193,6 +204,7 @@ def main():
             success = get_tags(client)
             logger.debug( "Exiting with code %d", 0 if success else 1)
             sys.exit(0 if success else 1)
+            
     # ------------- Direct Upload -------------
         if args.upload and not args.recursive:
             logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
@@ -268,7 +280,7 @@ def main():
                 
                 logger.trace("Exiting after direct upload with code 0")
                 sys.exit(0)
-            elif not args.recursive:  # Only show error if not in recursive mode
+            elif not args.recursive:
                 logger.error("File not found or not a regular file: %s", args.input_filename)
                 logger.debug("File exists: %s, Is file: %s", 
                           os.path.exists(args.input_filename), 
@@ -308,7 +320,7 @@ def main():
                 sys.exit(1)
         else:
             logger.info("Successfully enabled media tag support")
-    
+        
     # ------------- Recursive Processing -------------
     if args.recursive:
         logger.info("Processing folders recursively: %s", args.input_filename)
@@ -334,14 +346,28 @@ def main():
                 task_out_filename = os.path.join(folder_path, f"{output_name}.taf")
             else:
                 task_out_filename = os.path.join(output_dir, f"{output_name}.taf")
-                
+            
+            skip_creation = False
+            if os.path.exists(task_out_filename):
+                logger.warning("Output file already exists: %s", task_out_filename)
+                valid_taf = check_tonie_file_cli(task_out_filename)
+
+                if valid_taf and not args.force_creation:
+                    logger.warning("Valid Tonie file: %s", task_out_filename)
+                    logger.warning("Skipping creation step for existing Tonie file: %s", task_out_filename)
+                    skip_creation = True
+                else:
+                    logger.info("Output file exists but is not a valid Tonie file, proceeding to create a new one.")
+            
             logger.info("[%d/%d] Processing folder: %s -> %s", 
                       task_index + 1, len(process_tasks), folder_path, task_out_filename)
             
-            create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
-                           args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                           args.auto_download, not args.use_legacy_tags)
-            logger.info("Successfully created Tonie file: %s", task_out_filename)
+            if not skip_creation:
+                create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
+                               args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
+                               args.auto_download, not args.use_legacy_tags)
+                logger.info("Successfully created Tonie file: %s", task_out_filename)
+            
             created_files.append(task_out_filename)
     # ------------- Recursive File Upload -------------       
             if args.upload:                
@@ -418,9 +444,7 @@ def main():
     guessed_name = None
     if args.use_media_tags:
         if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
-            folder_path = os.path.dirname(files[0])
-            
-            from .media_tags import extract_album_info, format_metadata_filename
+            folder_path = os.path.dirname(files[0])            
             logger.debug("Extracting album info from folder: %s", folder_path)
             
             album_info = extract_album_info(folder_path)
