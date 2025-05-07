@@ -55,7 +55,7 @@ def upload_artwork(client: TeddyCloudClient, taf_filename, source_path, audio_fi
                                           f"{taf_name}{artwork_ext}")
         
         if renamed_artwork_path != artwork_path:
-            shutil.copy2(artwork_path, renamed_artwork_path)
+            shutil.copy(artwork_path, renamed_artwork_path)
             logger.debug("Created renamed artwork copy: %s", renamed_artwork_path)
         
         logger.info("Uploading artwork to path: %s as %s%s", 
