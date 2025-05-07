@@ -394,10 +394,10 @@ def main():
                     # tonies.custom.json generation
                 if args.create_custom_json:
                     success = fetch_and_update_tonies_json(client, task_out_filename, audio_files, artwork_url, output_dir)
-                if success:
-                    logger.info("Successfully updated Tonies JSON for %s", task_out_filename)
-                else:
-                    logger.warning("Failed to update Tonies JSON for %s", task_out_filename)
+                    if success:
+                        logger.info("Successfully updated Tonies JSON for %s", task_out_filename)
+                    else:
+                        logger.warning("Failed to update Tonies JSON for %s", task_out_filename)
         
         logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
         sys.exit(0)
@@ -529,6 +529,9 @@ def main():
             out_filename = os.path.join(output_dir, guessed_name)
             logger.debug("Using default output location: %s", out_filename)
     
+    # Make sure source_dir is defined for later use with artwork upload
+    source_dir = os.path.dirname(files[0]) if files else '.'
+
     if args.append_tonie_tag:
         logger.debug("Appending Tonie tag to output filename")
         hex_tag = args.append_tonie_tag
@@ -572,10 +575,10 @@ def main():
             # tonies.custom.json generation
         if args.create_custom_json:
             success = fetch_and_update_tonies_json(client, out_filename, files, artwork_url)
-        if success:
-            logger.info("Successfully updated Tonies JSON for %s", out_filename)
-        else:
-            logger.warning("Failed to update Tonies JSON for %s", out_filename)
+            if success:
+                logger.info("Successfully updated Tonies JSON for %s", out_filename)
+            else:
+                logger.warning("Failed to update Tonies JSON for %s", out_filename)
 
 if __name__ == "__main__":
     main()

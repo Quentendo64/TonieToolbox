@@ -11,6 +11,7 @@ import time
 import locale
 import re
 import hashlib
+import mutagen
 from typing import Dict, Any, List, Optional
 
 from .logger import get_logger
@@ -123,6 +124,8 @@ class ToniesJsonHandler:
     def add_entry_from_taf(self, taf_file: str, input_files: List[str], artwork_url: Optional[str] = None) -> bool:
         """
         Add an entry to the custom JSON from a TAF file.
+        If an entry with the same hash exists, it will be updated.
+        If an entry with the same series+episode exists, the new hash will be added to it.
         
         Args:
             taf_file: Path to the TAF file
@@ -142,17 +145,77 @@ class ToniesJsonHandler:
         try:
             logger.info("Adding entry for %s to tonies.custom.json", taf_file)
             
+            logger.debug("Extracting metadata from input files")
+            metadata = self._extract_metadata_from_files(input_files)
+            logger.debug("Extracted metadata: %s", metadata)
+            with open(taf_file, 'rb') as f:
+                taf_hash = hashlib.sha1(f.read()).hexdigest()
+            
+            taf_size = os.path.getsize(taf_file)
+            timestamp = int(time.time())
+            series = metadata.get('albumartist', metadata.get('artist', 'Unknown Artist'))
+            episode = metadata.get('album', os.path.splitext(os.path.basename(taf_file))[0])
+            track_desc = metadata.get('track_descriptions', [])
+            language = self._determine_language(metadata)
+            category = self._determine_category(metadata)
+            age = self._estimate_age(metadata)
+            new_id_entry = {
+                "audio-id": timestamp,
+                "hash": taf_hash,
+                "size": taf_size,
+                "tracks": len(track_desc),
+                "confidence": 1
+            }
+            existing_entry, entry_idx, data_idx = self.find_entry_by_hash(taf_hash)
+            if existing_entry:
+                logger.info("Found existing entry with the same hash, updating it")
+                data = existing_entry['data'][data_idx]
+                if artwork_url and artwork_url != data.get('image', ''):
+                    logger.debug("Updating artwork URL")
+                    data['image'] = artwork_url
+                if track_desc and track_desc != data.get('track-desc', []):
+                    logger.debug("Updating track descriptions")
+                    data['track-desc'] = track_desc
+                
+                logger.info("Successfully updated existing entry for %s", taf_file)
+                return True
+            existing_entry, entry_idx, data_idx = self.find_entry_by_series_episode(series, episode)
+            if existing_entry:
+                logger.info("Found existing entry with the same series/episode, adding hash to it")
+                existing_data = existing_entry['data'][data_idx]
+                if 'ids' not in existing_data:
+                    existing_data['ids'] = []
+                
+                existing_data['ids'].append(new_id_entry)
+                if artwork_url and artwork_url != existing_data.get('image', ''):
+                    logger.debug("Updating artwork URL")
+                    existing_data['image'] = artwork_url
+                
+                logger.info("Successfully added new hash to existing entry for %s", taf_file)
+                return True
+            logger.debug("No existing entry found, creating new entry")
             logger.debug("Generating article ID")
             article_id = self._generate_article_id()
             logger.debug("Generated article ID: %s", article_id)
             
-            logger.debug("Extracting metadata from input files")
-            metadata = self._extract_metadata_from_files(input_files)
-            logger.debug("Extracted metadata: %s", metadata)
-            
-            logger.debug("Creating JSON entry")
-            entry = self._create_json_entry(article_id, taf_file, metadata, input_files, artwork_url)
-            logger.debug("Created entry: %s", entry)
+            entry = {
+                "article": article_id,
+                "data": [
+                    {
+                        "series": series,
+                        "episode": episode,
+                        "release": timestamp,
+                        "language": language,
+                        "category": category,
+                        "runtime": self._calculate_runtime(input_files),
+                        "age": age,
+                        "origin": "custom",
+                        "image": artwork_url if artwork_url else "",
+                        "track-desc": track_desc,
+                        "ids": [new_id_entry]
+                    }
+                ]
+            }
             
             self.custom_json.append(entry)
             logger.debug("Added entry to custom_json (new length: %d)", len(self.custom_json))
@@ -294,48 +357,129 @@ class ToniesJsonHandler:
         
         return default_age
     
-    def _create_json_entry(self, article_id: str, taf_file: str, metadata: Dict[str, Any], 
-                          input_files: List[str], artwork_url: Optional[str] = None) -> Dict[str, Any]:
-        taf_size = os.path.getsize(taf_file)
-        timestamp = int(time.time())
-        series = metadata.get('albumartist', metadata.get('artist', 'Unknown Artist'))
-        episode = metadata.get('album', os.path.splitext(os.path.basename(taf_file))[0])
-        track_desc = metadata.get('track_descriptions', [])
-        language = self._determine_language(metadata)
-        category = self._determine_category(metadata)
-        age = self._estimate_age(metadata)
-        with open(taf_file, 'rb') as f:
-            taf_hash = hashlib.sha1(f.read()).hexdigest()
-        entry = {
-            "article": article_id,
-            "data": [
-                {
-                    "series": series,
-                    "episode": episode,
-                    "release": timestamp,
-                    "language": language,
-                    "category": category,
-                    "runtime": 0,  # TODO: Could calculate this with proper audio analysis
-                    "age": age,
-                    "origin": "custom",
-                    "image": artwork_url if artwork_url else "",
-                    "track-desc": track_desc,
-                    "ids": [
-                        {
-                            "audio-id": timestamp,
-                            "hash": taf_hash,
-                            "size": taf_size,
-                            "tracks": len(track_desc),
-                            "confidence": 1
-                        }
-                    ]
-                }
-            ]
-        }
+    def find_entry_by_hash(self, taf_hash: str) -> tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+        """
+        Find an entry in the custom JSON by TAF hash.
         
-        return entry
+        Args:
+            taf_hash: SHA1 hash of the TAF file to find
+            
+        Returns:
+            Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
+        """
+        logger.trace("Searching for entry with hash %s", taf_hash)
+        
+        for entry_idx, entry in enumerate(self.custom_json):
+            if 'data' not in entry:
+                continue
+                
+            for data_idx, data in enumerate(entry['data']):
+                if 'ids' not in data:
+                    continue
+                    
+                for id_entry in data['ids']:
+                    if id_entry.get('hash') == taf_hash:
+                        logger.debug("Found existing entry with matching hash %s", taf_hash)
+                        return entry, entry_idx, data_idx
+        
+        logger.debug("No entry found with hash %s", taf_hash)
+        return None, None, None
+    
+    def find_entry_by_series_episode(self, series: str, episode: str) -> tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+        """
+        Find an entry in the custom JSON by series and episode.
+        
+        Args:
+            series: Series name to find
+            episode: Episode name to find
+            
+        Returns:
+            Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
+        """
+        logger.trace("Searching for entry with series='%s', episode='%s'", series, episode)
+        
+        for entry_idx, entry in enumerate(self.custom_json):
+            if 'data' not in entry:
+                continue
+                
+            for data_idx, data in enumerate(entry['data']):
+                if data.get('series') == series and data.get('episode') == episode:
+                    logger.debug("Found existing entry with matching series/episode: %s / %s", series, episode)
+                    return entry, entry_idx, data_idx
+        
+        logger.debug("No entry found with series/episode: %s / %s", series, episode)
+        return None, None, None
 
+    def _calculate_runtime(self, input_files: List[str]) -> int:
+        """
+        Calculate the total runtime in minutes from a list of audio files.
 
+        Args:
+            input_files: List of paths to audio files
+
+        Returns:
+            Total runtime in minutes (rounded to the nearest minute)
+        """
+        logger.trace("Entering _calculate_runtime() with %d input files", len(input_files))
+        total_runtime_seconds = 0
+        processed_files = 0
+        
+        try:
+            logger.debug("Starting runtime calculation for %d audio files", len(input_files))
+            
+            for i, file_path in enumerate(input_files):
+                logger.trace("Processing file %d/%d: %s", i+1, len(input_files), file_path)
+                
+                if not os.path.exists(file_path):
+                    logger.warning("File does not exist: %s", file_path)
+                    continue
+                    
+                try:
+                    logger.trace("Loading audio file with mutagen: %s", file_path)
+                    audio = mutagen.File(file_path)
+                    
+                    if audio is None:
+                        logger.warning("Mutagen could not identify file format: %s", file_path)
+                        continue
+                        
+                    if not hasattr(audio, 'info'):
+                        logger.warning("Audio file has no info attribute: %s", file_path)
+                        continue
+                        
+                    if not hasattr(audio.info, 'length'):
+                        logger.warning("Audio info has no length attribute: %s", file_path)
+                        continue
+                        
+                    file_runtime_seconds = int(audio.info.length)
+                    total_runtime_seconds += file_runtime_seconds
+                    processed_files += 1
+                    
+                    logger.debug("File %s: runtime=%d seconds, format=%s", 
+                                file_path, file_runtime_seconds, audio.__class__.__name__)
+                    logger.trace("Current total runtime: %d seconds after %d/%d files", 
+                                total_runtime_seconds, i+1, len(input_files))
+                    
+                except Exception as e:
+                    logger.warning("Error processing file %s: %s", file_path, e)
+                    logger.trace("Exception details for %s: %s", file_path, str(e), exc_info=True)
+
+            # Convert seconds to minutes, rounding to nearest minute
+            total_runtime_minutes = round(total_runtime_seconds / 60)
+            
+            logger.info("Calculated total runtime: %d seconds (%d minutes) from %d/%d files", 
+                        total_runtime_seconds, total_runtime_minutes, processed_files, len(input_files))
+            
+        except ImportError as e:
+            logger.warning("Mutagen library not available, cannot calculate runtime: %s", str(e))
+            return 0
+        except Exception as e:
+            logger.error("Unexpected error during runtime calculation: %s", str(e))
+            logger.trace("Exception details: %s", str(e), exc_info=True)
+            return 0
+
+        logger.trace("Exiting _calculate_runtime() with total runtime=%d minutes", total_runtime_minutes)
+        return total_runtime_minutes
+    
 def fetch_and_update_tonies_json(client: TeddyCloudClient, taf_file: Optional[str] = None, input_files: Optional[List[str]] = None, 
                                artwork_url: Optional[str] = None, output_dir: Optional[str] = None) -> bool:
     """
