@@ -193,7 +193,7 @@ def main():
             success = get_tags(client)
             logger.log(logging.DEBUG - 1, "Exiting with code %d", 0 if success else 1)
             sys.exit(0 if success else 1)
-    
+    # ------------- Direct Upload -------------
         if args.upload:
             logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
 
@@ -205,7 +205,8 @@ def main():
                 file_path = args.input_filename
                 logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
                 response = client.upload_file(
-                    destination_path=args.path,                    
+                    destination_path=args.path, 
+                    file_path=file_path,                   
                     special=args.special_folder,
                 )
                 upload_success = response.get('success', False)
@@ -214,6 +215,25 @@ def main():
                     sys.exit(1)
                 else:
                     logger.info("Successfully uploaded %s to TeddyCloud", file_path)
+                artwork_url = None
+                if args.include_artwork and file_path.lower().endswith('.taf'):
+                    source_dir = os.path.dirname(file_path)
+                    logger.info("Looking for artwork to upload for %s", file_path)
+                    success, artwork_url = upload_artwork(client, file_path, source_dir, [])
+                    if success:
+                        logger.info("Successfully uploaded artwork for %s", file_path)
+                    else:
+                        logger.warning("Failed to upload artwork for %s", file_path)
+                if args.create_custom_json and file_path.lower().endswith('.taf'):
+                    output_dir = './output'
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir, exist_ok=True)
+                    success = fetch_and_update_tonies_json(client, file_path, [], artwork_url, output_dir)
+                    if success:
+                        logger.info("Successfully updated Tonies JSON for %s", file_path)
+                    else:
+                        logger.warning("Failed to update Tonies JSON for %s", file_path)
+                
                 logger.log(logging.DEBUG - 1, "Exiting after direct upload with code 0")
                 sys.exit(0)
     # ------------- Librarys / Prereqs -------------
@@ -309,7 +329,6 @@ def main():
         logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
         sys.exit(0)
     # ------------- Single File Processing -------------
-    # Handle directory or file input
     if os.path.isdir(args.input_filename):
         logger.debug("Input is a directory: %s", args.input_filename)
         args.input_filename += "/*"
