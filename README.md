@@ -1,11 +1,14 @@
 # TonieToolbox 🎵📦
 
+[![Publish to DockerHub](https://github.com/Quentendo64/TonieToolbox/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
+[![Publish to PyPI](https://github.com/Quentendo64/TonieToolbox/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![PyPI version](https://badge.fury.io/py/tonietoolbox.svg)](https://badge.fury.io/py/tonietoolbox)
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/docker/pulls/quentendo64/tonietoolbox)](https://hub.docker.com/r/quentendo64/tonietoolbox)
 
-A Python tool for creating custom audio content for Tonie boxes by converting various audio formats into the Tonie-compatible TAF format (Tonie Audio Format).
+A Toolkit for converting various audio formats into the Tonie-compatible TAF format (Tonie Audio Format) and interacting with [TeddyCloud powered by RevvoX](https://github.com/toniebox-reverse-engineering/teddycloud)
 
 ## 🚀 Get Started
 
@@ -36,6 +39,7 @@ A Python tool for creating custom audio content for Tonie boxes by converting va
 - [Related Projects](#related-projects)
 - [Contributing](#contributing)
 - [Legal Notice](#legal-notice)
+- [Support](#support)
 
 ## Overview
 
@@ -62,7 +66,7 @@ The tool provides several capabilities:
 - opus-tools (specifically `opusenc` for encoding to opus format)
 - mutagen (for reading audio file metadata, auto-installed when needed)
 
-***Make sure FFmpeg and opus-tools are installed on your system and accessible in your PATH.***
+***Make sure FFmpeg and opus-tools are installed on your system and accessible in your PATH.***  
 If the requirements are not found in PATH, TonieToolbox will download the missing requirements with --auto-download.
 
 ## Installation
@@ -176,26 +180,33 @@ Using TonieToolbox with Docker simplifies the setup process as all dependencies 
 
 **Convert a single audio file to Tonie format:**
 
-```bash
-# Use docker run
-docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+**On Windows PowerShell/Unix/macOS:**
 
-# Or using docker-compose
+```bash
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+```
+
+**On Windows (CMD):**
+
+```cmd
+docker run --rm -v "%cd%\input:/tonietoolbox/input" -v "%cd%\output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+```
+
+**Or using docker-compose**
+
+```shell
 docker-compose run --rm tonietoolbox input/my-audio-file.mp3
 ```
 
 **Process folders recursively:**
 
 ```bash
-# Use docker run
 docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive input/folder
-
 ```
 
 **Advanced options with Docker:**
 
 ```bash
-# Convert with custom settings
 docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive --use-media-tags --name-template "{album} - {artist}" --bitrate 128 input/folder
 ```
 
@@ -571,10 +582,12 @@ This will convert the input file to TAF format and then upload it to the TeddyCl
 
 ```shell
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --path "/custom_audio"
-The path needs to be existing in the TeddyCloud Library.
+# The path must already exist in the TeddyCloud Library.
 ```
 
 #### Upload with artwork
+
+> **Note:** This function will only work if the `/custom_img` folder is mounted in the TeddyCloud Library. For an easy start and to handle this automatically (and much more), use [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter).
 
 TonieToolbox can automatically find and upload cover artwork alongside your Tonie files:
 
@@ -612,7 +625,7 @@ Use this option if the TeddyCloud server uses a self-signed certificate.
 To convert an entire audiobook series with proper metadata and upload to TeddyCloud:
 
 ```shell
-tonietoolbox --recursive --use-media-tags --name-template "{YEAR} - {ALBUMARTIST} - {ALBUM}" --bitrate 128 --upload https://teddycloud.example.com --include-artwork "C:\Hörspiele\Die Drei Fragezeichen"
+tonietoolbox --recursive --use-media-tags --name-template "{year} - {albumartist} - {album}" --bitrate 128 --upload https://teddycloud.example.com --include-artwork "C:\Hörspiele\Die Drei Fragezeichen"
 ```
 
 This command will:
@@ -643,7 +656,6 @@ This command:
 For complex media tag processing:
 
 ```shell
-
 # First check available tags
 tonietoolbox --show-tags "C:\Music\Classical\Bach"
 
@@ -651,7 +663,7 @@ tonietoolbox --show-tags "C:\Music\Classical\Bach"
 tonietoolbox "C:\Music\Classical\Bach" --use-media-tags --name-template "{composer} - {opus} in {key} ({conductor}, {orchestra})"
 ```
 
-The first command shows what tags are available, allowing you to create precise naming templates for classical music collections as example.
+The first command shows what tags are available, allowing you to create precise naming templates for classical music collections.
 
 ## Technical Details
 
@@ -700,6 +712,7 @@ For optimal compatibility with Tonie boxes:
 - Bitrate of 96 kbps VBR is recommended
 
 **Mono audio handling:**
+
 - By default, TonieToolbox will automatically convert mono audio files to stereo for compatibility.
 - To disable this behavior (and require your input to already be stereo), use the `--no-mono-conversion` flag.
 
@@ -734,7 +747,8 @@ This is particularly useful for debugging when creating TAF files with different
 This project is inspired by and builds upon the work of other Tonie-related open source projects:
 
 - [opus2tonie](https://github.com/bailli/opus2tonie) - A command line utility to convert opus files to the Tonie audio format
-- [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud) - Self-hosted alternative to the Tonie cloud for managing custom Tonies
+- [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud) - Self-hosted alternative to the Tonie cloud / Boxine cloud for managing custom content
+- [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter) - A Wizard for Docker-based deployment of [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud)
 
 ## Contributing
 
@@ -744,10 +758,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is an independent, community-driven effort created for educational and personal use purposes.
 
-- tonies®, toniebox®, Hörfigur® are registered trademarks of [tonies GmbH](https://tonies.com).
+- tonies®, toniebox®, and Hörfigur® are registered trademarks of [tonies GmbH](https://tonies.com).
 - This project is not affiliated with, endorsed by, or connected to tonies GmbH in any way.
 - TonieToolbox is provided "as is" without warranty of any kind, either express or implied.
 - Users are responsible for ensuring their usage complies with all applicable copyright and intellectual property laws.
 - This tool is intended for personal use with legally owned content only.
 
 By using TonieToolbox, you acknowledge that the authors of this software take no responsibility for any potential misuse or any damages that might result from the use of this software.
+
+## Support
+
+If you need help, have questions, or want to report a bug, please use the following channels:
+
+- [GitHub Issues](https://github.com/Quentendo64/TonieToolbox/issues) for bug reports and feature requests
+- [GitHub Discussions](https://github.com/Quentendo64/TonieToolbox/discussions) for general questions and community support
+- [HOWTO Guide](HOWTO.md) for common usage instructions
