@@ -1,6 +1,6 @@
 # TonieToolbox 🎵📦
 
-[![Publish to DockerHub](https://github.com/Quentendo64/TonieToolbox/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
+[![Publish to DockerHub](https://github.com/Quentendo64/TonieToolbox/actions/workflows/publish-to-docker.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
 [![Publish to PyPI](https://github.com/Quentendo64/TonieToolbox/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
