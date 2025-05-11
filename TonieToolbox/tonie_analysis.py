@@ -11,12 +11,13 @@ from .ogg_page import OggPage
 from .logger import get_logger
 
 logger = get_logger('tonie_analysis')
-def format_time(ts):
+
+def format_time(ts: float) -> str:
     """
     Format a timestamp as a human-readable date and time string.
     
     Args:
-        ts: Timestamp to format
+        ts (float): Timestamp to format
         
     Returns:
         str: Formatted date and time string
@@ -24,12 +25,12 @@ def format_time(ts):
     return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 
-def format_hex(data):
+def format_hex(data: bytes) -> str:
     """
     Format binary data as a hex string.
     
     Args:
-        data: Binary data to format
+        data (bytes): Binary data to format
         
     Returns:
         str: Formatted hex string
@@ -37,13 +38,13 @@ def format_hex(data):
     return "".join(format(x, "02X") for x in data)
 
 
-def granule_to_time_string(granule, sample_rate=1):
+def granule_to_time_string(granule: int, sample_rate: int = 1) -> str:
     """
     Convert a granule position to a time string.
     
     Args:
-        granule: Granule position
-        sample_rate: Sample rate in Hz
+        granule (int): Granule position
+        sample_rate (int): Sample rate in Hz
         
     Returns:
         str: Formatted time string (HH:MM:SS.FF)
@@ -56,7 +57,7 @@ def granule_to_time_string(granule, sample_rate=1):
     return "{:02d}:{:02d}:{:02d}.{:02d}".format(hours, minutes, seconds, fraction)
 
 
-def get_header_info(in_file):
+def get_header_info(in_file) -> tuple:
     """
     Get header information from a Tonie file.
     
@@ -164,15 +165,15 @@ def get_header_info(in_file):
     )
 
 
-def get_audio_info(in_file, sample_rate, tonie_header, header_size):
+def get_audio_info(in_file, sample_rate: int, tonie_header, header_size: int) -> tuple:
     """
     Get audio information from a Tonie file.
     
     Args:
         in_file: Input file handle
-        sample_rate: Sample rate in Hz
+        sample_rate (int): Sample rate in Hz
         tonie_header: Tonie header object
-        header_size: Header size in bytes
+        header_size (int): Header size in bytes
         
     Returns:
         tuple: Page count, alignment OK flag, page size OK flag, total time, chapter times
@@ -228,12 +229,12 @@ def get_audio_info(in_file, sample_rate, tonie_header, header_size):
     return page_count, alignment_okay, page_size_okay, total_time, chapter_times
 
 
-def check_tonie_file(filename):
+def check_tonie_file(filename: str) -> bool:
     """
     Check if a file is a valid Tonie file and display information about it.
     
     Args:
-        filename: Path to the file to check
+        filename (str): Path to the file to check
         
     Returns:
         bool: True if the file is valid, False otherwise
@@ -315,13 +316,13 @@ def check_tonie_file(filename):
     return all_ok
 
 
-def split_to_opus_files(filename, output=None):
+def split_to_opus_files(filename: str, output: str = None) -> None:
     """
     Split a Tonie file into individual Opus files.
     
     Args:
-        filename: Path to the Tonie file
-        output: Output directory path (optional)
+        filename (str): Path to the Tonie file
+        output (str | None): Output directory path (optional)
     """
     logger.info("Splitting Tonie file into individual Opus tracks: %s", filename)
     
@@ -412,14 +413,14 @@ def split_to_opus_files(filename, output=None):
         logger.info("Successfully split Tonie file into %d individual tracks", len(tonie_header.chapterPages))
 
 
-def compare_taf_files(file1, file2, detailed=False):
+def compare_taf_files(file1: str, file2: str, detailed: bool = False) -> bool:
     """
     Compare two .taf files for debugging purposes.
     
     Args:
-        file1: Path to the first .taf file
-        file2: Path to the second .taf file
-        detailed: Whether to show detailed comparison results
+        file1 (str): Path to the first .taf file
+        file2 (str): Path to the second .taf file
+        detailed (bool): Whether to show detailed comparison results
         
     Returns:
         bool: True if files are equivalent, False otherwise
@@ -572,7 +573,7 @@ def compare_taf_files(file1, file2, detailed=False):
         logger.info("Files comparison result: Equivalent")
         return True
 
-def get_header_info_cli(in_file):
+def get_header_info_cli(in_file) -> tuple:
     """
     Get header information from a Tonie file.
     
@@ -687,12 +688,12 @@ def get_header_info_cli(in_file):
         return (0, tonie_header_pb2.TonieHeader(), 0, 0, None, False, 0, 0, 0, 0, {}, False)
 
 
-def check_tonie_file_cli(filename):
+def check_tonie_file_cli(filename: str) -> bool:
     """
     Check if a file is a valid Tonie file
     
     Args:
-        filename: Path to the file to check
+        filename (str): Path to the file to check
         
     Returns:
         bool: True if the file is valid, False otherwise

@@ -18,12 +18,12 @@ from .logger import get_logger
 logger = get_logger('ogg_page')
 
 
-def create_crc_table():
+def create_crc_table() -> list[int]:
     """
     Create a CRC lookup table for OGG page checksums.
     
     Returns:
-        list: CRC32 lookup table for OGG pages
+        list[int]: CRC32 lookup table for OGG pages
     """
     logger.debug("Creating CRC table for OGG page checksums")
     table = []
@@ -39,12 +39,12 @@ def create_crc_table():
 CRC_TABLE = create_crc_table()
 
 
-def crc32(bytestream):
+def crc32(bytestream: bytes) -> int:
     """
     Calculate a CRC32 checksum for the given bytestream.
     
     Args:
-        bytestream: Bytes to calculate the CRC for
+        bytestream (bytes): Bytes to calculate the CRC for
         
     Returns:
         int: CRC32 checksum
@@ -64,7 +64,7 @@ class OggPage:
     with particular focus on features needed for Tonie compatibility.
     """
     
-    def __init__(self, filehandle):
+    def __init__(self, filehandle) -> None:
         """
         Initialize a new OggPage.
         
@@ -88,7 +88,7 @@ class OggPage:
         self.parse_header(filehandle)
         self.parse_segments(filehandle)
 
-    def parse_header(self, filehandle):
+    def parse_header(self, filehandle) -> None:
         """
         Parse the OGG page header.
         
@@ -108,7 +108,7 @@ class OggPage:
         logger.trace("Parsed OGG header - Page #%d, Type: %d, Granule: %d, Serial: %d, Segments: %d",
                    self.page_no, self.page_type, self.granule_position, self.serial_no, self.segment_count)
 
-    def parse_segments(self, filehandle):
+    def parse_segments(self, filehandle) -> None:
         """
         Parse the segments in this OGG page.
         
@@ -133,12 +133,12 @@ class OggPage:
             logger.error("Found an opus packet spanning OGG pages, which is not supported")
             raise RuntimeError("Found an opus packet spanning ogg pages. This is not supported yet.")
 
-    def correct_values(self, last_granule):
+    def correct_values(self, last_granule: int) -> None:
         """
         Correct the granule position and checksum for this page.
         
         Args:
-            last_granule: Last granule position
+            last_granule (int): Last granule position
             
         Raises:
             RuntimeError: If there are too many segments in the page
@@ -160,7 +160,7 @@ class OggPage:
         logger.trace("Corrected OGG page values: Page #%d, Segments: %d, Granule: %d", 
                    self.page_no, self.segment_count, self.granule_position)
 
-    def calc_checksum(self):
+    def calc_checksum(self) -> int:
         """
         Calculate the checksum for this page.
         
@@ -178,7 +178,7 @@ class OggPage:
         logger.trace("Calculated checksum for page #%d: 0x%X", self.page_no, checksum)
         return checksum
 
-    def get_page_size(self):
+    def get_page_size(self) -> int:
         """
         Get the total size of this page in bytes.
         
@@ -190,7 +190,7 @@ class OggPage:
             size = size + len(segment.data)
         return size
 
-    def get_size_of_first_opus_packet(self):
+    def get_size_of_first_opus_packet(self) -> int:
         """
         Get the size of the first opus packet in bytes.
         
@@ -208,7 +208,7 @@ class OggPage:
             i = i + 1
         return size
 
-    def get_segment_count_of_first_opus_packet(self):
+    def get_segment_count_of_first_opus_packet(self) -> int:
         """
         Get the number of segments in the first opus packet.
         
@@ -224,14 +224,14 @@ class OggPage:
             count = count + 1
         return count
 
-    def insert_empty_segment(self, index_after, spanning_packet=False, first_packet=False):
+    def insert_empty_segment(self, index_after: int, spanning_packet: bool = False, first_packet: bool = False) -> None:
         """
         Insert an empty segment after the specified index.
         
         Args:
-            index_after: Index to insert the segment after
-            spanning_packet: Whether this segment belongs to a packet that spans pages
-            first_packet: Whether this is the first segment of a packet
+            index_after (int): Index to insert the segment after
+            spanning_packet (bool): Whether this segment belongs to a packet that spans pages
+            first_packet (bool): Whether this is the first segment of a packet
         """
         logger.trace("Inserting empty segment after index %d (spanning: %s, first: %s)",
                    index_after, spanning_packet, first_packet)
@@ -242,12 +242,12 @@ class OggPage:
         segment.data = bytes()
         self.segments.insert(index_after + 1, segment)
 
-    def get_opus_packet_size(self, seg_start):
+    def get_opus_packet_size(self, seg_start: int) -> int:
         """
         Get the size of the opus packet starting at the specified segment index.
         
         Args:
-            seg_start: Starting segment index
+            seg_start (int): Starting segment index
             
         Returns:
             int: Size of the opus packet in bytes
@@ -259,12 +259,12 @@ class OggPage:
             seg_start = seg_start + 1
         return size
 
-    def get_segment_count_of_packet_at(self, seg_start):
+    def get_segment_count_of_packet_at(self, seg_start: int) -> int:
         """
         Get the number of segments in the packet starting at the specified segment index.
         
         Args:
-            seg_start: Starting segment index
+            seg_start (int): Starting segment index
             
         Returns:
             int: Number of segments
@@ -274,13 +274,13 @@ class OggPage:
             seg_end = seg_end + 1
         return seg_end - seg_start
 
-    def redistribute_packet_data_at(self, seg_start, pad_count):
+    def redistribute_packet_data_at(self, seg_start: int, pad_count: int) -> None:
         """
         Redistribute packet data starting at the specified segment index.
         
         Args:
-            seg_start: Starting segment index
-            pad_count: Number of padding bytes to add
+            seg_start (int): Starting segment index
+            pad_count (int): Number of padding bytes to add
         """
         logger.trace("Redistributing packet data at segment %d with %d padding bytes", 
                    seg_start, pad_count)
@@ -316,14 +316,14 @@ class OggPage:
         logger.trace("Redistribution complete, %d segments used", seg_count)
         assert len(full_data) == 0
 
-    def convert_packet_to_framepacking_three_and_pad(self, seg_start, pad=False, count=0):
+    def convert_packet_to_framepacking_three_and_pad(self, seg_start: int, pad: bool = False, count: int = 0) -> None:
         """
         Convert the packet to framepacking three mode and add padding if required.
         
         Args:
-            seg_start: Starting segment index
-            pad: Whether to add padding
-            count: Number of padding bytes to add
+            seg_start (int): Starting segment index
+            pad (bool): Whether to add padding
+            count (int): Number of padding bytes to add
             
         Raises:
             AssertionError: If the segment is not the first packet
@@ -336,13 +336,13 @@ class OggPage:
             self.segments[seg_start].set_pad_count(count)
         self.redistribute_packet_data_at(seg_start, count)
 
-    def calc_actual_padding_value(self, seg_start, bytes_needed):
+    def calc_actual_padding_value(self, seg_start: int, bytes_needed: int) -> int:
         """
         Calculate the actual padding value needed for the packet.
         
         Args:
-            seg_start: Starting segment index
-            bytes_needed: Number of bytes needed for padding
+            seg_start (int): Starting segment index
+            bytes_needed (int): Number of bytes needed for padding
             
         Returns:
             int: Actual padding value or a special return code
@@ -426,13 +426,13 @@ class OggPage:
             logger.trace("Calculated actual padding value: %d", result)
             return result
 
-    def pad(self, pad_to, idx_offset=-1):
+    def pad(self, pad_to: int, idx_offset: int = -1) -> None:
         """
         Pad the page to the specified size.
         
         Args:
-            pad_to: Target size to pad to
-            idx_offset: Index offset to start from, defaults to last segment
+            pad_to (int): Target size to pad to
+            idx_offset (int): Index offset to start from, defaults to last segment
             
         Raises:
             RuntimeError: If beginning of last packet cannot be found
@@ -490,7 +490,7 @@ class OggPage:
                        final_size, pad_to)
         assert final_size == pad_to
 
-    def pad_one_byte(self):
+    def pad_one_byte(self) -> None:
         """
         Add one byte of padding to the page.
         
@@ -515,7 +515,7 @@ class OggPage:
             logger.trace("Converting packet to framepacking 3")
             self.convert_packet_to_framepacking_three_and_pad(i)
 
-    def write_page(self, filehandle, sha1=None):
+    def write_page(self, filehandle, sha1=None) -> None:
         """
         Write the page to a file handle.
         
@@ -537,12 +537,12 @@ class OggPage:
             segment.write(filehandle)
 
     @staticmethod
-    def from_page(other_page):
+    def from_page(other_page: 'OggPage') -> 'OggPage':
         """
         Create a new OggPage based on another page.
         
         Args:
-            other_page: Source page to copy from
+            other_page (OggPage): Source page to copy from
             
         Returns:
             OggPage: New page with copied properties
@@ -560,7 +560,7 @@ class OggPage:
         return new_page
 
     @staticmethod
-    def seek_to_page_header(filehandle):
+    def seek_to_page_header(filehandle) -> bool:
         """
         Seek to the next OGG page header in a file.
         

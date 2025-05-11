@@ -19,27 +19,33 @@ DEFAULT_RETRY_DELAY = 5  # seconds
 class TeddyCloudClient:
     """Client for interacting with TeddyCloud API."""
     
-    def __init__(self, base_url: str, ignore_ssl_verify: bool = False, 
-                 connection_timeout: int = DEFAULT_CONNECTION_TIMEOUT, 
-                 read_timeout: int = DEFAULT_READ_TIMEOUT, 
-                 max_retries: int = DEFAULT_MAX_RETRIES, 
-                 retry_delay: int = DEFAULT_RETRY_DELAY,
-                 username: str = None, password: str = None,
-                 cert_file: str = None, key_file: str = None):
+    def __init__(
+        self,
+        base_url: str,
+        ignore_ssl_verify: bool = False,
+        connection_timeout: int = DEFAULT_CONNECTION_TIMEOUT,
+        read_timeout: int = DEFAULT_READ_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_delay: int = DEFAULT_RETRY_DELAY,
+        username: str = None,
+        password: str = None,
+        cert_file: str = None,
+        key_file: str = None
+    ) -> None:
         """
         Initialize the TeddyCloud client.
         
         Args:
-            base_url: Base URL of the TeddyCloud instance (e.g., https://teddycloud.example.com)
-            ignore_ssl_verify: If True, SSL certificate verification will be disabled (useful for self-signed certificates)
-            connection_timeout: Timeout for establishing a connection
-            read_timeout: Timeout for reading data from the server
-            max_retries: Maximum number of retries for failed requests
-            retry_delay: Delay between retries
-            username: Username for basic authentication (optional)
-            password: Password for basic authentication (optional)
-            cert_file: Path to client certificate file for certificate-based authentication (optional)
-            key_file: Path to client private key file for certificate-based authentication (optional)
+            base_url (str): Base URL of the TeddyCloud instance (e.g., https://teddycloud.example.com)
+            ignore_ssl_verify (bool): If True, SSL certificate verification will be disabled (useful for self-signed certificates)
+            connection_timeout (int): Timeout for establishing a connection
+            read_timeout (int): Timeout for reading data from the server
+            max_retries (int): Maximum number of retries for failed requests
+            retry_delay (int): Delay between retries
+            username (str | None): Username for basic authentication (optional)
+            password (str | None): Password for basic authentication (optional)
+            cert_file (str | None): Path to client certificate file for certificate-based authentication (optional)
+            key_file (str | None): Path to client private key file for certificate-based authentication (optional)
         """
         self.base_url = base_url.rstrip('/')
         self.ignore_ssl_verify = ignore_ssl_verify
@@ -81,7 +87,7 @@ class TeddyCloudClient:
             except ssl.SSLError as e:
                 raise ValueError(f"Failed to load client certificate: {e}")
                 
-    def _create_request_kwargs(self):
+    def _create_request_kwargs(self) -> dict:
         """
         Create common request keyword arguments for all API calls.
         
@@ -98,18 +104,16 @@ class TeddyCloudClient:
             kwargs['cert'] = self.cert       
         return kwargs
     
-    def _make_request(self, method, endpoint, **kwargs):
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> 'requests.Response':
         """
         Make an HTTP request to the TeddyCloud API with retry logic.
         
         Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint (without base URL)
+            method (str): HTTP method (GET, POST, etc.)
+            endpoint (str): API endpoint (without base URL)
             **kwargs: Additional arguments to pass to requests
-            
         Returns:
             requests.Response: Response object
-            
         Raises:
             requests.exceptions.RequestException: If request fails after all retries
         """
@@ -171,7 +175,7 @@ class TeddyCloudClient:
 
     # ------------- GET API Methods -------------
     
-    def get_tonies_custom_json(self):
+    def get_tonies_custom_json(self) -> dict:
         """
         Get custom Tonies JSON data from the TeddyCloud server.
         
@@ -181,7 +185,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/toniesCustomJson')
         return response.json()
     
-    def get_tonies_json(self):
+    def get_tonies_json(self) -> dict:
         """
         Get Tonies JSON data from the TeddyCloud server.
         
@@ -191,7 +195,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/toniesJson')
         return response.json()
     
-    def get_tag_index(self):
+    def get_tag_index(self) -> dict:
         """
         Get tag index data from the TeddyCloud server.
         
@@ -201,7 +205,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/getTagIndex')
         return response.json()    
     
-    def get_file_index(self):
+    def get_file_index(self) -> dict:
         """
         Get file index data from the TeddyCloud server.
         
@@ -211,7 +215,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/fileIndex')
         return response.json()
     
-    def get_file_index_v2(self):
+    def get_file_index_v2(self) -> dict:
         """
         Get version 2 file index data from the TeddyCloud server.
         
@@ -221,7 +225,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/fileIndexV2')
         return response.json()
     
-    def get_tonieboxes_json(self):
+    def get_tonieboxes_json(self) -> dict:
         """
         Get Tonieboxes JSON data from the TeddyCloud server.
         
@@ -233,15 +237,14 @@ class TeddyCloudClient:
     
     # ------------- POST API Methods -------------
     
-    def create_directory(self, path, overlay=None, special=None):
+    def create_directory(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Create a directory on the TeddyCloud server.
         
         Args:
-            path: Directory path to create
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): Directory path to create
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -254,15 +257,14 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/dirCreate', params=params, data=path)
         return response.text
     
-    def delete_directory(self, path, overlay=None, special=None):
+    def delete_directory(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Delete a directory from the TeddyCloud server.
         
         Args:
-            path: Directory path to delete
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): Directory path to delete
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -275,15 +277,14 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/dirDelete', params=params, data=path)
         return response.text
     
-    def delete_file(self, path, overlay=None, special=None):
+    def delete_file(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Delete a file from the TeddyCloud server.
         
         Args:
-            path: File path to delete
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): File path to delete
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -296,16 +297,15 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/fileDelete', params=params, data=path)
         return response.text
     
-    def upload_file(self, file_path, destination_path=None, overlay=None, special=None):
+    def upload_file(self, file_path: str, destination_path: str = None, overlay: str = None, special: str = None) -> dict:
         """
         Upload a file to the TeddyCloud server.
         
         Args:
-            file_path: Local path to the file to upload
-            destination_path: Server path where to write the file to (optional)
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            file_path (str): Local path to the file to upload
+            destination_path (str | None): Server path where to write the file to (optional)
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             dict: JSON response from server
         """

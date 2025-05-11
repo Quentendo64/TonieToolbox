@@ -12,22 +12,30 @@ from .logger import get_logger
 logger = get_logger('audio_conversion')
 
 
-def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitrate=48, vbr=True, keep_temp=False, auto_download=False, no_mono_conversion=False):
+def get_opus_tempfile(
+    ffmpeg_binary: str = None,
+    opus_binary: str = None,
+    filename: str = None,
+    bitrate: int = 48,
+    vbr: bool = True,
+    keep_temp: bool = False,
+    auto_download: bool = False,
+    no_mono_conversion: bool = False
+) -> tuple[tempfile.SpooledTemporaryFile | None, str | None]:
     """
     Convert an audio file to Opus format and return a temporary file handle.
     
     Args:
-        ffmpeg_binary: Path to the ffmpeg binary. If None, will be auto-detected or downloaded.
-        opus_binary: Path to the opusenc binary. If None, will be auto-detected or downloaded.
-        filename: Path to the input audio file
-        bitrate: Bitrate for the Opus encoding in kbps
-        vbr: Whether to use variable bitrate encoding
-        keep_temp: Whether to keep the temporary files for testing
-        auto_download: Whether to automatically download dependencies if not found
-        no_mono_conversion: Whether to skip mono to stereo conversion
-        
+        ffmpeg_binary (str | None): Path to the ffmpeg binary. If None, will be auto-detected or downloaded.
+        opus_binary (str | None): Path to the opusenc binary. If None, will be auto-detected or downloaded.
+        filename (str | None): Path to the input audio file
+        bitrate (int): Bitrate for the Opus encoding in kbps
+        vbr (bool): Whether to use variable bitrate encoding
+        keep_temp (bool): Whether to keep the temporary files for testing
+        auto_download (bool): Whether to automatically download dependencies if not found
+        no_mono_conversion (bool): Whether to skip mono to stereo conversion
     Returns:
-        tuple: (file handle, temp_file_path) or (file handle, None) if keep_temp is False
+        tuple[tempfile.SpooledTemporaryFile | None, str | None]: (file handle, temp_file_path) or (file handle, None) if keep_temp is False
     """
     logger.trace("Entering get_opus_tempfile(ffmpeg_binary=%s, opus_binary=%s, filename=%s, bitrate=%d, vbr=%s, keep_temp=%s, auto_download=%s, no_mono_conversion=%s)",
                 ffmpeg_binary, opus_binary, filename, bitrate, vbr, keep_temp, auto_download, no_mono_conversion)
@@ -198,15 +206,14 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         return tmp_file, None
 
 
-def filter_directories(glob_list):
+def filter_directories(glob_list: list[str]) -> list[str]:
     """
     Filter a list of glob results to include only audio files that can be handled by ffmpeg.
     
     Args:
-        glob_list: List of path names from glob.glob()
-        
+        glob_list (list[str]): List of path names from glob.glob()
     Returns:
-        list: Filtered list containing only supported audio files
+        list[str]: Filtered list containing only supported audio files
     """
     logger.trace("Entering filter_directories() with %d items", len(glob_list))
     logger.debug("Filtering %d glob results for supported audio files", len(glob_list))
@@ -232,17 +239,16 @@ def filter_directories(glob_list):
     return filtered
 
 
-def get_input_files(input_filename):
+def get_input_files(input_filename: str) -> list[str]:
     """
     Get a list of input files to process.
     
     Supports direct file paths, directory paths, glob patterns, and .lst files.
     
     Args:
-        input_filename: Input file pattern or list file path
-        
+        input_filename (str): Input file pattern or list file path
     Returns:
-        list: List of input file paths
+        list[str]: List of input file paths
     """
     logger.trace("Entering get_input_files(input_filename=%s)", input_filename)
     logger.debug("Getting input files for pattern: %s", input_filename)
@@ -320,14 +326,13 @@ def get_input_files(input_filename):
     return input_files
 
 
-def append_to_filename(output_filename, tag):
+def append_to_filename(output_filename: str, tag: str) -> str:
     """
     Append a tag to a filename, preserving the extension.
     
     Args:
-        output_filename: Original filename
-        tag: Tag to append (typically an 8-character hex value)
-        
+        output_filename (str): Original filename
+        tag (str): Tag to append (typically an 8-character hex value)
     Returns:
         str: Modified filename with tag
     """

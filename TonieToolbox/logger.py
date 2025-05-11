@@ -13,7 +13,7 @@ TRACE = 5  # Custom level for ultra-verbose debugging
 logging.addLevelName(TRACE, 'TRACE')
 
 # Create a method for the TRACE level
-def trace(self, message, *args, **kwargs):
+def trace(self: logging.Logger, message: str, *args, **kwargs) -> None:
     """Log a message with TRACE level (more detailed than DEBUG)"""
     if self.isEnabledFor(TRACE):
         self.log(TRACE, message, *args, **kwargs)
@@ -21,7 +21,7 @@ def trace(self, message, *args, **kwargs):
 # Add trace method to the Logger class
 logging.Logger.trace = trace
 
-def get_log_file_path():
+def get_log_file_path() -> Path:
     """
     Get the path to the log file in the .tonietoolbox folder with timestamp.
     
@@ -40,14 +40,13 @@ def get_log_file_path():
     
     return log_file
 
-def setup_logging(level=logging.INFO, log_to_file=False):
+def setup_logging(level: int = logging.INFO, log_to_file: bool = False) -> logging.Logger:
     """
     Set up logging configuration for the entire application.
     
     Args:
-        level: Logging level (default: logging.INFO)
-        log_to_file: Whether to log to a file (default: False)
-        
+        level (int): Logging level (default: logging.INFO)
+        log_to_file (bool): Whether to log to a file (default: False)
     Returns:
         logging.Logger: Root logger instance
     """
@@ -88,13 +87,12 @@ def setup_logging(level=logging.INFO, log_to_file=False):
     
     return root_logger
 
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     """
     Get a logger with the specified name.
     
     Args:
-        name: Logger name, typically the module name
-        
+        name (str): Logger name, typically the module name
     Returns:
         logging.Logger: Logger instance
     """

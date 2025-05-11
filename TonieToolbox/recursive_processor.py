@@ -14,16 +14,16 @@ from .logger import get_logger
 logger = get_logger('recursive_processor')
 
 
-def find_audio_folders(root_path: str) -> List[Dict[str, any]]:
+def find_audio_folders(root_path: str) -> list[dict[str, any]]:
     """
     Find and return all folders that contain audio files in a recursive manner,
     organized in a way that handles nested folder structures.
     
     Args:
-        root_path: Root directory to start searching from
+        root_path (str): Root directory to start searching from
         
     Returns:
-        List of dictionaries with folder information, including paths and relationships
+        list[dict[str, any]]: List of dictionaries with folder information, including paths and relationships
     """
     logger.info("Finding folders with audio files in: %s", root_path)
     
@@ -68,15 +68,15 @@ def find_audio_folders(root_path: str) -> List[Dict[str, any]]:
     return folder_list
 
 
-def determine_processing_folders(folders: List[Dict[str, any]]) -> List[Dict[str, any]]:
+def determine_processing_folders(folders: list[dict[str, any]]) -> list[dict[str, any]]:
     """
     Determine which folders should be processed based on their position in the hierarchy.
     
     Args:
-        folders: List of folder dictionaries with hierarchy information
+        folders (list[dict[str, any]]): List of folder dictionaries with hierarchy information
         
     Returns:
-        List of folders that should be processed (filtered)
+        list[dict[str, any]]: List of folders that should be processed (filtered)
     """
     # We'll use a set to track which folders we've decided to process
     to_process = set()
@@ -120,15 +120,15 @@ def determine_processing_folders(folders: List[Dict[str, any]]) -> List[Dict[str
     return result
 
 
-def get_folder_audio_files(folder_path: str) -> List[str]:
+def get_folder_audio_files(folder_path: str) -> list[str]:
     """
     Get all audio files in a specific folder.
     
     Args:
-        folder_path: Path to folder
+        folder_path (str): Path to folder
         
     Returns:
-        List of paths to audio files in natural sort order
+        list[str]: List of paths to audio files in natural sort order
     """
     audio_files = glob.glob(os.path.join(folder_path, "*"))
     filtered_files = filter_directories(audio_files)
@@ -140,15 +140,15 @@ def get_folder_audio_files(folder_path: str) -> List[str]:
     return sorted_files
 
 
-def natural_sort(file_list: List[str]) -> List[str]:
+def natural_sort(file_list: list[str]) -> list[str]:
     """
     Sort a list of files in natural order (so that 2 comes before 10).
     
     Args:
-        file_list: List of file paths
+        file_list (list[str]): List of file paths
         
     Returns:
-        Naturally sorted list of file paths
+        list[str]: Naturally sorted list of file paths
     """
     def convert(text):
         return int(text) if text.isdigit() else text.lower()
@@ -159,16 +159,16 @@ def natural_sort(file_list: List[str]) -> List[str]:
     return sorted(file_list, key=alphanum_key)
 
 
-def extract_folder_meta(folder_path: str) -> Dict[str, str]:
+def extract_folder_meta(folder_path: str) -> dict[str, str]:
     """
     Extract metadata from folder name.
     Common format might be: "YYYY - NNN - Title"
     
     Args:
-        folder_path: Path to folder
+        folder_path (str): Path to folder
         
     Returns:
-        Dictionary with extracted metadata (year, number, title)
+        dict[str, str]: Dictionary with extracted metadata (year, number, title)
     """
     folder_name = os.path.basename(folder_path)
     logger.debug("Extracting metadata from folder: %s", folder_name)
@@ -210,12 +210,12 @@ def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False
     and optionally audio file metadata.
     
     Args:
-        folder_path: Path to folder
-        use_media_tags: Whether to use media tags from audio files if available
-        template: Optional template for formatting output name using media tags
+        folder_path (str): Path to folder
+        use_media_tags (bool): Whether to use media tags from audio files if available
+        template (str | None): Optional template for formatting output name using media tags
         
     Returns:
-        String with cleaned output name
+        str: String with cleaned output name
     """
     folder_meta = extract_folder_meta(folder_path)
     output_name = None    
@@ -289,17 +289,17 @@ def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False
     return output_name
 
 
-def process_recursive_folders(root_path, use_media_tags=False, name_template=None):
+def process_recursive_folders(root_path: str, use_media_tags: bool = False, name_template: str = None) -> list[tuple[str, str, list[str]]]:
     """
     Process folders recursively for audio files to create Tonie files.
     
     Args:
         root_path (str): The root path to start processing from
         use_media_tags (bool): Whether to use media tags for naming
-        name_template (str): Template for naming files using media tags
+        name_template (str | None): Template for naming files using media tags
     
     Returns:
-        list: A list of tuples (output_name, folder_path, audio_files)
+        list[tuple[str, str, list[str]]]: A list of tuples (output_name, folder_path, audio_files)
     """
     logger = get_logger("recursive_processor")
     logger.info("Processing folders recursively: %s", root_path)

@@ -18,15 +18,14 @@ CACHE_FILE = os.path.join(CACHE_DIR, "version_cache.json")
 CACHE_EXPIRY = 86400  # 24 hours in seconds
 
 
-def get_pypi_version(force_refresh=False):
+def get_pypi_version(force_refresh: bool = False) -> tuple[str, str | None]:
     """
     Get the latest version of TonieToolbox from PyPI.
     
     Args:
-        force_refresh: If True, ignore the cache and fetch directly from PyPI
-        
+        force_refresh (bool): If True, ignore the cache and fetch directly from PyPI
     Returns:
-        tuple: (latest_version, None) on success, (current_version, error_message) on failure
+        tuple[str, str | None]: (latest_version, None) on success, (current_version, error_message) on failure
     """
     logger = get_logger("version_handler")
     logger.debug("Checking for latest version (force_refresh=%s)", force_refresh)
@@ -88,14 +87,13 @@ def get_pypi_version(force_refresh=False):
         return __version__, f"Unexpected error checking for updates: {str(e)}"
 
 
-def compare_versions(v1, v2):
+def compare_versions(v1: str, v2: str) -> int:
     """
     Compare two version strings according to PEP 440.
     
     Args:
-        v1: First version string
-        v2: Second version string
-        
+        v1 (str): First version string
+        v2 (str): Second version string
     Returns:
         int: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
     """
@@ -133,16 +131,15 @@ def compare_versions(v1, v2):
             return 1
 
 
-def check_for_updates(quiet=False, force_refresh=False):
+def check_for_updates(quiet: bool = False, force_refresh: bool = False) -> tuple[bool, str, str, bool]:
     """
     Check if the current version of TonieToolbox is the latest.
     
     Args:
-        quiet: If True, will not log any information messages and skip user confirmation
-        force_refresh: If True, bypass cache and check PyPI directly
-        
+        quiet (bool): If True, will not log any information messages and skip user confirmation
+        force_refresh (bool): If True, bypass cache and check PyPI directly
     Returns:
-        tuple: (is_latest, latest_version, message, update_confirmed)
+        tuple[bool, str, str, bool]: (is_latest, latest_version, message, update_confirmed)
             is_latest: boolean indicating if the current version is the latest
             latest_version: string with the latest version
             message: string message about the update status or error
@@ -200,7 +197,7 @@ def check_for_updates(quiet=False, force_refresh=False):
     return is_latest, latest_version, message, update_confirmed
 
 
-def install_update():
+def install_update() -> bool:
     """
     Try to install the update using pip, pip3, or pipx.
     
@@ -238,7 +235,7 @@ def install_update():
     return False
 
 
-def clear_version_cache():
+def clear_version_cache() -> bool:
     """
     Clear the version cache file to force a refresh on next check.
     
