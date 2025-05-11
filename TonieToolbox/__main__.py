@@ -19,7 +19,7 @@ from .recursive_processor import process_recursive_folders
 from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
-from .tonies_json import fetch_and_update_tonies_json
+from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
 
 def main():
@@ -51,6 +51,8 @@ def main():
                        help='Delay between retry attempts in seconds (default: 5)')
     teddycloud_group.add_argument('--create-custom-json', action='store_true',
                        help='Fetch and update custom Tonies JSON data')
+    teddycloud_group.add_argument('--version-2', action='store_true',
+                       help='Use version 2 of the Tonies JSON format (default: version 1)')
     # ------------- Parser - Authentication options for TeddyCloud -------------
     teddycloud_group.add_argument('--username', action='store', metavar='USERNAME',
                        help='Username for basic authentication')
@@ -273,7 +275,12 @@ def main():
                     logger.debug("Updating tonies.custom.json with: taf=%s, artwork_url=%s", 
                               file_path, artwork_url)
                     client_param = client
-                    success = fetch_and_update_tonies_json(client_param, file_path, [], artwork_url, output_dir)
+
+                    if args.version_2:
+                        logger.debug("Using version 2 of the Tonies JSON format")
+                        success = fetch_and_update_tonies_json_v2(client_param, file_path, [], artwork_url, output_dir)
+                    else:
+                        success = fetch_and_update_tonies_json_v1(client_param, file_path, [], artwork_url, output_dir)
                     if success:
                         logger.info("Successfully updated Tonies JSON for %s", file_path)
                     else:
@@ -405,7 +412,11 @@ def main():
                 base_path = os.path.dirname(args.input_filename)
                 json_output_dir = base_path if args.output_to_source else output_dir
                 client_param = client if 'client' in locals() else None
-                success = fetch_and_update_tonies_json(client_param, task_out_filename, audio_files, artwork_url, json_output_dir)
+                if args.version_2:
+                    logger.debug("Using version 2 of the Tonies JSON format")
+                    success = fetch_and_update_tonies_json_v2(client_param, task_out_filename, audio_files, artwork_url, json_output_dir)
+                else:
+                    success = fetch_and_update_tonies_json_v1(client_param, task_out_filename, audio_files, artwork_url, json_output_dir)
                 if success:
                     logger.info("Successfully updated Tonies JSON for %s", task_out_filename)
                 else:
@@ -571,7 +582,11 @@ def main():
     if args.create_custom_json:
         json_output_dir = source_dir if args.output_to_source else './output'
         client_param = client if 'client' in locals() else None
-        success = fetch_and_update_tonies_json(client_param, out_filename, files, artwork_url, json_output_dir)
+        if args.version_2:
+            logger.debug("Using version 2 of the Tonies JSON format")
+            success = fetch_and_update_tonies_json_v2(client_param, out_filename, files, artwork_url, json_output_dir)
+        else:
+            success = fetch_and_update_tonies_json_v1(client_param, out_filename, files, artwork_url, json_output_dir)
         if success:
             logger.info("Successfully updated Tonies JSON for %s", out_filename)
         else:
