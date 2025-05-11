@@ -12,7 +12,7 @@ from .logger import get_logger
 logger = get_logger('audio_conversion')
 
 
-def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitrate=48, vbr=True, keep_temp=False, auto_download=False):
+def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitrate=48, vbr=True, keep_temp=False, auto_download=False, no_mono_conversion=False):
     """
     Convert an audio file to Opus format and return a temporary file handle.
     
@@ -24,12 +24,13 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         vbr: Whether to use variable bitrate encoding
         keep_temp: Whether to keep the temporary files for testing
         auto_download: Whether to automatically download dependencies if not found
+        no_mono_conversion: Whether to skip mono to stereo conversion
         
     Returns:
         tuple: (file handle, temp_file_path) or (file handle, None) if keep_temp is False
     """
-    logger.trace("Entering get_opus_tempfile(ffmpeg_binary=%s, opus_binary=%s, filename=%s, bitrate=%d, vbr=%s, keep_temp=%s, auto_download=%s)",
-                ffmpeg_binary, opus_binary, filename, bitrate, vbr, keep_temp, auto_download)
+    logger.trace("Entering get_opus_tempfile(ffmpeg_binary=%s, opus_binary=%s, filename=%s, bitrate=%d, vbr=%s, keep_temp=%s, auto_download=%s, no_mono_conversion=%s)",
+                ffmpeg_binary, opus_binary, filename, bitrate, vbr, keep_temp, auto_download, no_mono_conversion)
     
     logger.debug("Converting %s to Opus format (bitrate: %d kbps, vbr: %s)", filename, bitrate, vbr)
     
@@ -52,6 +53,38 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
     vbr_parameter = "--vbr" if vbr else "--hard-cbr"
     logger.debug("Using encoding parameter: %s", vbr_parameter)
 
+    is_mono = False
+    ffprobe_path = None
+    ffmpeg_dir, ffmpeg_file = os.path.split(ffmpeg_binary)
+    ffprobe_candidates = [
+        os.path.join(ffmpeg_dir, 'ffprobe'),
+        os.path.join(ffmpeg_dir, 'ffprobe.exe'),
+        'ffprobe',
+        'ffprobe.exe',
+    ]
+    for candidate in ffprobe_candidates:
+        if os.path.exists(candidate):
+            ffprobe_path = candidate
+            break
+    if ffprobe_path:
+        try:
+            probe_cmd = [ffprobe_path, '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=channels', '-of', 'default=noprint_wrappers=1:nokey=1', filename]
+            logger.debug(f"Probing audio channels with: {' '.join(probe_cmd)}")
+            result = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                channels = result.stdout.strip()
+                logger.debug(f"Detected channels: {channels}")
+                if channels == '1':
+                    is_mono = True
+            else:
+                logger.warning(f"ffprobe failed to detect channels: {result.stderr}")
+        except Exception as e:
+            logger.warning(f"Mono detection failed: {e}")
+    else:
+        logger.warning("ffprobe not found, will always force stereo conversion for non-Opus input.")
+        is_mono = True  # Always force stereo if we can't check
+    logger.info(f"Mono detected: {is_mono}, no_mono_conversion: {no_mono_conversion}")
+
     temp_path = None
     if keep_temp:
         temp_dir = os.path.join(tempfile.gettempdir(), "tonie_toolbox_temp")
@@ -62,7 +95,12 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         
         logger.debug("Starting FFmpeg process")
         try:
-            ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+            if is_mono and not no_mono_conversion:
+                ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-ac", "2", "-"]
+                logger.info(f"Forcing stereo conversion for mono input: {' '.join(ffmpeg_cmd)}")
+            else:
+                ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+                logger.info(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
             logger.trace("FFmpeg command: %s", ffmpeg_cmd)
             ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
         except FileNotFoundError:
@@ -106,7 +144,12 @@ def get_opus_tempfile(ffmpeg_binary=None, opus_binary=None, filename=None, bitra
         
         logger.debug("Starting FFmpeg process")
         try:
-            ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+            if is_mono and not no_mono_conversion:
+                ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-ac", "2", "-"]
+                logger.info(f"Forcing stereo conversion for mono input: {' '.join(ffmpeg_cmd)}")
+            else:
+                ffmpeg_cmd = [ffmpeg_binary, "-hide_banner", "-loglevel", "warning", "-i", filename, "-f", "wav", "-ar", "48000", "-"]
+                logger.info(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
             logger.trace("FFmpeg command: %s", ffmpeg_cmd)
             ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
         except FileNotFoundError:

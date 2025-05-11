@@ -1,11 +1,19 @@
-# TonieToolbox
-### WIP - Work in Progress
-Happy Testing :-P
+# TonieToolbox 🎵📦
 
-A Python tool for converting audio files to Tonie box compatible format (TAF - Tonie Audio Format).
+[![Publish to DockerHub](https://github.com/Quentendo64/TonieToolbox/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
+[![Publish to PyPI](https://github.com/Quentendo64/TonieToolbox/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/Quentendo64/TonieToolbox/actions)
 
-# Beginners Guide
-- [HOWTO](HOWTO.md)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![PyPI version](https://badge.fury.io/py/tonietoolbox.svg)](https://badge.fury.io/py/tonietoolbox)
+[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/docker/pulls/quentendo64/tonietoolbox)](https://hub.docker.com/r/quentendo64/tonietoolbox)
+
+A Toolkit for converting various audio formats into the Tonie-compatible TAF format (Tonie Audio Format) and interacting with [TeddyCloud powered by RevvoX](https://github.com/toniebox-reverse-engineering/teddycloud)
+
+## 🚀 Get Started
+
+→ [HOWTO Guide for Beginners](HOWTO.md)  
+→ [Contributing Guidelines](CONTRIBUTING.md)
 
 ## Table of Contents
 
@@ -31,6 +39,7 @@ A Python tool for converting audio files to Tonie box compatible format (TAF - T
 - [Related Projects](#related-projects)
 - [Contributing](#contributing)
 - [Legal Notice](#legal-notice)
+- [Support](#support)
 
 ## Overview
 
@@ -57,14 +66,14 @@ The tool provides several capabilities:
 - opus-tools (specifically `opusenc` for encoding to opus format)
 - mutagen (for reading audio file metadata, auto-installed when needed)
 
-Make sure FFmpeg and opus-tools are installed on your system and accessible in your PATH.
-If the requirements are not found in PATH. TonieToolbox will download the missing requirements with --auto-download.
+***Make sure FFmpeg and opus-tools are installed on your system and accessible in your PATH.***  
+If the requirements are not found in PATH, TonieToolbox will download the missing requirements with --auto-download.
 
 ## Installation
 
 ### Install from PyPI (Recommended)
 
-```
+```shell
 pip install tonietoolbox
 ```
 
@@ -72,7 +81,7 @@ This will install TonieToolbox and its dependencies, making the `tonietoolbox` c
 
 ### Install from Source
 
-```
+```shell
 # Clone the repository
 git clone https://github.com/Quentendo64/TonieToolbox.git
 cd TonieToolbox
@@ -87,7 +96,7 @@ TonieToolbox is available as a Docker image, which comes with all dependencies p
 
 #### Pull the Docker Image
 
-```
+```shell
 # From Docker Hub
 docker pull quentendo64/tonietoolbox:latest
 
@@ -97,13 +106,13 @@ docker pull ghcr.io/quentendo64/tonietoolbox:latest
 
 #### Build the Docker Image Locally
 
-```
+```shell
 docker build -t tonietoolbox .
 ```
 
 Or using docker-compose:
 
-```
+```shell
 docker-compose build
 ```
 
@@ -114,12 +123,14 @@ docker-compose build
 **Convert a single audio file to Tonie format:**
 
 If installed via pip:
-```
+
+```shell
 tonietoolbox input.mp3
 ```
 
 If installed from source:
-```
+
+```shell
 python TonieToolbox.py input.mp3
 ```
 
@@ -127,7 +138,7 @@ This will create a file named `input.taf` in the `.\output` directory.
 
 **Specify output filename:**
 
-```
+```shell
 tonietoolbox input.mp3 my_tonie.taf
 ```
 
@@ -137,13 +148,13 @@ This will create a file named `my_tonie.taf` in the `.\output` directory.
 
 You can specify a directory to convert all audio files within it:
 
-```
+```shell
 tonietoolbox input_directory/
 ```
 
 Or use a list file (.lst) containing paths to multiple audio files:
 
-```
+```shell
 tonietoolbox playlist.lst
 ```
 
@@ -151,7 +162,7 @@ tonietoolbox playlist.lst
 
 To process an entire folder structure with multiple audio folders:
 
-```
+```shell
 tonietoolbox --recursive "Music/Albums"
 ```
 
@@ -159,7 +170,7 @@ This will scan all subfolders, identify those containing audio files, and create
 
 By default, all generated TAF files are saved in the `.\output` directory. If you want to save each TAF file in its source directory instead:
 
-```
+```shell
 tonietoolbox --recursive --output-to-source "Music/Albums"
 ```
 
@@ -169,26 +180,33 @@ Using TonieToolbox with Docker simplifies the setup process as all dependencies 
 
 **Convert a single audio file to Tonie format:**
 
-```bash
-# Use docker run
-docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+**On Windows PowerShell/Unix/macOS:**
 
-# Or using docker-compose
+```bash
+docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+```
+
+**On Windows (CMD):**
+
+```cmd
+docker run --rm -v "%cd%\input:/tonietoolbox/input" -v "%cd%\output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
+```
+
+**Or using docker-compose**
+
+```shell
 docker-compose run --rm tonietoolbox input/my-audio-file.mp3
 ```
 
 **Process folders recursively:**
 
 ```bash
-# Use docker run
 docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive input/folder
-
 ```
 
 **Advanced options with Docker:**
 
 ```bash
-# Convert with custom settings
 docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonietoolbox/output" quentendo64/tonietoolbox --recursive --use-media-tags --name-template "{album} - {artist}" --bitrate 128 input/folder
 ```
 
@@ -202,12 +220,13 @@ docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonieto
 
 Run the following command to see all available options:
 
-```
+```shell
 tonietoolbox -h
 ```
 
 Output:
-```
+
+```shell
 usage: TonieToolbox.py [-h] [-v] [--upload URL] [--include-artwork] [--get-tags URL] 
                     [--ignore-ssl-verify] [--special-folder FOLDER] [--path PATH]
                     [--show-progress] [--connection-timeout SECONDS]
@@ -266,6 +285,7 @@ optional arguments:
   -C, --compare FILE2   Compare input file with another .taf file for debugging
   -D, --detailed-compare
                         Show detailed OGG page differences when comparing files
+  --no-mono-conversion  Do not convert mono audio to stereo (default: convert mono to stereo)
 Media Tag Options:
   -m, --use-media-tags  Use media tags from audio files for naming
   --name-template TEMPLATE
@@ -290,51 +310,51 @@ Logging Options:
 
 ### Common Usage Examples
 
-#### Analyze a Tonie file:
+#### Analyze a Tonie file
 
-```
+```shell
 tonietoolbox --info my_tonie.taf
 ```
 
-#### Split a Tonie file into individual opus tracks:
+#### Split a Tonie file into individual opus tracks
 
-```
+```shell
 tonietoolbox --split my_tonie.taf 
 ```
 
-#### Compare TAF files:
+#### Compare TAF files
 
 Compare two TAF files for debugging purposes:
 
-```
+```shell
 tonietoolbox file1.taf --compare file2.taf
 ```
 
 For detailed comparison including OGG page differences:
 
-```
+```shell
 tonietoolbox file1.taf --compare file2.taf --detailed-compare
 ```
 
-#### Custom timestamp options:
+#### Custom timestamp options
 
-```
+```shell
 tonietoolbox input.mp3 --timestamp 1745078762  # UNIX Timestamp
 tonietoolbox input.mp3 --timestamp 0x6803C9EA  # Bitstream time
 tonietoolbox input.mp3 --timestamp ./reference.taf  # Reference TAF for extraction
 ```
 
-#### Set custom bitrate:
+#### Set custom bitrate
 
-```
+```shell
 tonietoolbox input.mp3 --bitrate 128
 ```
 
-#### Constant bitrate encoding:
+#### Constant bitrate encoding
 
 For more predictable file sizes and consistent quality, use constant bitrate (CBR) encoding:
 
-```
+```shell
 # Encode with constant bitrate at 96 kbps (default)
 tonietoolbox input.mp3 --cbr
 
@@ -342,36 +362,36 @@ tonietoolbox input.mp3 --cbr
 tonietoolbox input.mp3 --cbr --bitrate 128
 ```
 
-#### Append Tonie tag:
+#### Append Tonie tag
 
 You can append a hexadecimal tag to the filename, which is useful for organizing Tonie files:
 
-```
+```shell
 # Add an 8-character hex tag to filename
 tonietoolbox input.mp3 --append-tonie-tag 7F8A6B2E
 
 # The output will be named "input-7F8A6B2E.taf"
 ```
 
-#### Process a complex folder structure:
+#### Process a complex folder structure
 
 Process an audiobook series with multiple folders:
 
-```
-tonietoolbox --recursive "\Hörspiele\Die drei Fragezeichen\Folgen"
+```shell
+tonietoolbox --recursive "C:\Hörspiele\Die drei Fragezeichen\Folgen"
 ```
 
 Process a music collection with nested album folders and save TAF files alongside the source directories:
 
-```
-tonietoolbox --recursive --output-to-source "\Hörspiele\" 
+```shell
+tonietoolbox --recursive --output-to-source "C:\Hörspiele\" 
 ```
 
-#### Automatic dependency download:
+#### Automatic dependency download
 
 If FFmpeg or opusenc are not found in your PATH, TonieToolbox can automatically download them:
 
-```
+```shell
 # Automatically download dependencies when needed
 tonietoolbox input.mp3 --auto-download
 
@@ -379,36 +399,38 @@ tonietoolbox input.mp3 --auto-download
 tonietoolbox input.mp3 --ffmpeg "C:\path\to\ffmpeg.exe" --opusenc "C:\path\to\opusenc.exe"
 ```
 
-#### Keep temporary files:
+#### Keep temporary files
 
 When troubleshooting or debugging, you can keep the temporary opus files:
 
-```
+```shell
 # Keep temporary opus files in the temp folder
 tonietoolbox input.mp3 --keep-temp
 
 ```
 
-#### Working with list files:
+#### Working with list files
 
 Create a text file (.lst) with paths to audio files for batch processing:
 
-```
+```text
 # Contents of playlist.lst:
 C:\Music\song1.mp3
 "C:\Music\song2.flac"
 C:\Music\song3.wav
 "C:\Music Path With Spaces\song2.flac"
+```
 
+```shell
 # Process the list file
 tonietoolbox playlist.lst my_playlist.taf
 ```
 
-#### TeddyCloud advanced options:
+#### TeddyCloud advanced options
 
 Customize your TeddyCloud uploads with connection options:
 
-```
+```shell
 # Upload with custom timeouts and retry parameters
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --connection-timeout 20 --read-timeout 600 --max-retries 5 --retry-delay 10
 
@@ -419,19 +441,19 @@ tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --show-progres
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --special-folder library
 ```
 
-#### Get available tags from TeddyCloud:
+#### Get available tags from TeddyCloud
 
 To see which tags you can use with your TeddyCloud server:
 
-```
+```shell
 tonietoolbox --get-tags https://teddycloud.example.com
 ```
 
-#### Version checking and updates:
+#### Version checking and updates
 
 TonieToolbox can check for newer versions and notify you when there are updates available:
 
-```
+```shell
 # Skip checking for updates if you're offline or want faster startup
 tonietoolbox input.mp3 --skip-update-check
 
@@ -442,29 +464,29 @@ tonietoolbox input.mp3 --force-refresh-cache
 tonietoolbox --clear-version-cache
 ```
 
-#### Legacy tag options:
+#### Legacy tag options
 
 Use legacy hardcoded tags instead of dynamic TonieToolbox tags:
 
-```
+```shell
 tonietoolbox input.mp3 --use-legacy-tags
 ```
 
-#### Create custom JSON data:
+#### Create custom JSON data
 
 When uploading to TeddyCloud, you can also update the custom Tonies JSON data with information about the uploaded file:
 
-```
+```shell
 tonietoolbox input.mp3 --upload https://teddycloud.example.com --create-custom-json
 ```
 
 This will fetch and update the custom Tonies JSON data in the TeddyCloud server with information from your audio files.
 
-#### Logging and Troubleshooting:
+#### Logging and Troubleshooting
 
 Control the verbosity of console output with different logging levels:
 
-```
+```shell
 # Enable detailed debug information (useful for troubleshooting)
 tonietoolbox input.mp3 --debug
 
@@ -480,7 +502,7 @@ tonietoolbox input.mp3 --silent
 
 You can combine logging options with other commands:
 
-```
+```shell
 # Debug mode while splitting a TAF file
 tonietoolbox --split my_tonie.taf --debug
 
@@ -492,45 +514,45 @@ tonietoolbox --recursive "Music/Collection/" --quiet
 
 TonieToolbox can read metadata tags from audio files (such as ID3 tags in MP3 files, Vorbis comments in FLAC/OGG files, etc.) and use them to create more meaningful filenames or display information about your audio collection.
 
-#### View available tags in audio files:
+#### View available tags in audio files
 
 To see what tags are available in your audio files:
 
-```
+```shell
 tonietoolbox --show-tags input.mp3
 ```
 
 This will display all readable tags from the file, which can be useful for creating naming templates.
 
-#### Use media tags for file naming:
+#### Use media tags for file naming
 
 To use the metadata from audio files when generating output filenames:
 
-```
+```shell
 tonietoolbox input.mp3 --use-media-tags
 ```
 
 For single files, this will use a default template of "{title} - {artist}" for the output filename.
 
-#### Custom naming templates:
+#### Custom naming templates
 
 You can specify custom templates for generating filenames based on the audio metadata:
 
-```
+```shell
 tonietoolbox input.mp3 --use-media-tags --name-template "{artist} - {album} - {title}"
 ```
 
-#### Recursive processing with media tags:
+#### Recursive processing with media tags
 
 When processing folders recursively, media tags can provide more consistent naming:
 
-```
+```shell
 tonietoolbox --recursive --use-media-tags "Music/Collection/"
 ```
 
 This will attempt to use the album information from the audio files for naming the output files:
 
-```
+```shell
 tonietoolbox --recursive --use-media-tags --name-template "{date} - {album} ({artist})" "Music/Collection/"
 ```
 
@@ -538,56 +560,59 @@ tonietoolbox --recursive --use-media-tags --name-template "{date} - {album} ({ar
 
 TonieToolbox can upload files directly to a TeddyCloud server, which is an alternative to the official Tonie cloud for managing custom Tonies.
 
-#### Upload a Tonie file to TeddyCloud:
+#### Upload a Tonie file to TeddyCloud
 
-```
+```shell
 tonietoolbox --upload https://teddycloud.example.com my_tonie.taf
 ```
 
 This will upload the specified Tonie file to the TeddyCloud server.
 
-#### Upload a newly created Tonie file:
+#### Upload a newly created Tonie file
 
 You can combine conversion and upload in a single command:
 
-```
+```shell
 tonietoolbox input.mp3 --upload https://teddycloud.example.com
 ```
 
 This will convert the input file to TAF format and then upload it to the TeddyCloud server.
 
-#### Upload with custom path:
+#### Upload with custom path
 
-```
+```shell
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --path "/custom_audio"
-The path needs to be existing in the TeddyCloud Library.
+# The path must already exist in the TeddyCloud Library.
 ```
 
-#### Upload with artwork:
+#### Upload with artwork
+
+> **Note:** This function will only work if the `/custom_img` folder is mounted in the TeddyCloud Library. For an easy start and to handle this automatically (and much more), use [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter).
 
 TonieToolbox can automatically find and upload cover artwork alongside your Tonie files:
 
-```
+```shell
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --include-artwork
 ```
 
 This will:
+
 1. Look for cover images (like "cover.jpg", "artwork.png", etc.) in the source directory
 2. If no cover image is found, attempt to extract embedded artwork from the audio files
 3. Upload the artwork to the "/custom_img" directory on the TeddyCloud server
 4. The artwork will be uploaded with the same filename as the Tonie file for easier association
 
-#### Recursive processing with uploads:
+#### Recursive processing with uploads
 
-```
+```shell
 tonietoolbox --recursive "Music/Albums" --upload https://teddycloud.example.com --include-artwork
 ```
 
 This will process all folders recursively, create TAF files, and upload both the TAF files and their cover artwork to the TeddyCloud server.
 
-#### Upload with SSL certificate verification disabled:
+#### Upload with SSL certificate verification disabled
 
-```
+```shell
 tonietoolbox my_tonie.taf --upload https://teddycloud.example.com --ignore-ssl-verify
 ```
 
@@ -599,11 +624,12 @@ Use this option if the TeddyCloud server uses a self-signed certificate.
 
 To convert an entire audiobook series with proper metadata and upload to TeddyCloud:
 
-```
-tonietoolbox --recursive --use-media-tags --name-template "{YEAR} - {ALBUMARTIST} - {ALBUM}" --bitrate 128 --upload https://teddycloud.example.com --include-artwork "C:\Hörspiele\Die Drei Fragezeichen"
+```shell
+tonietoolbox --recursive --use-media-tags --name-template "{year} - {albumartist} - {album}" --bitrate 128 --upload https://teddycloud.example.com --include-artwork "C:\Hörspiele\Die Drei Fragezeichen"
 ```
 
 This command will:
+
 1. Recursively process the Die Drei Fragezeichen audioplays directory
 2. Use a naming template based on source metadata
 3. Encode at 128 kbps
@@ -613,23 +639,23 @@ This command will:
 
 For a custom children's story collection with chapters:
 
-```
+```shell
 tonietoolbox story_collection.lst kids_stories.taf --bitrate 96 --cbr --auto-download --use-media-tags --name-template "{title} Stories" --debug
 ```
 
 This command:
+
 1. Processes a list of story audio files
 2. Names the output based on metadata
 3. Uses constant bitrate encoding for consistent quality
 4. Automatically downloads dependencies if needed
 5. Shows detailed debug information during the process
 
-
 ### Advanced Media Tag Usage
 
 For complex media tag processing:
 
-```
+```shell
 # First check available tags
 tonietoolbox --show-tags "C:\Music\Classical\Bach"
 
@@ -637,7 +663,7 @@ tonietoolbox --show-tags "C:\Music\Classical\Bach"
 tonietoolbox "C:\Music\Classical\Bach" --use-media-tags --name-template "{composer} - {opus} in {key} ({conductor}, {orchestra})"
 ```
 
-The first command shows what tags are available, allowing you to create precise naming templates for classical music collections as example.
+The first command shows what tags are available, allowing you to create precise naming templates for classical music collections.
 
 ## Technical Details
 
@@ -654,6 +680,7 @@ Located at the beginning of the file, structured as:
 - Padding to fill the entire 4096 bytes (0x1000)
 
 The Protocol Buffer structure contains:
+
 ```protobuf
 message TonieHeader {
   bytes dataHash = 1;      // SHA1 hash of the audio data
@@ -667,6 +694,7 @@ message TonieHeader {
 #### 2. Audio Data
 
 The audio data consists of:
+
 - Opus encoded audio in Ogg container format
 - Every page after the header has a fixed size of 4096 bytes (0x1000)
 - First page contains the Opus identification header
@@ -677,10 +705,16 @@ The audio data consists of:
 #### 3. Special Requirements
 
 For optimal compatibility with Tonie boxes:
-- Audio must be stereo (2 channels)
+
+- Audio should be stereo (2 channels)
 - Sample rate must be 48 kHz
 - Pages must be aligned to 4096 byte boundaries
 - Bitrate of 96 kbps VBR is recommended
+
+**Mono audio handling:**
+
+- By default, TonieToolbox will automatically convert mono audio files to stereo for compatibility.
+- To disable this behavior (and require your input to already be stereo), use the `--no-mono-conversion` flag.
 
 ### File Analysis
 
@@ -713,7 +747,8 @@ This is particularly useful for debugging when creating TAF files with different
 This project is inspired by and builds upon the work of other Tonie-related open source projects:
 
 - [opus2tonie](https://github.com/bailli/opus2tonie) - A command line utility to convert opus files to the Tonie audio format
-- [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud) - Self-hosted alternative to the Tonie cloud for managing custom Tonies
+- [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud) - Self-hosted alternative to the Tonie cloud / Boxine cloud for managing custom content
+- [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter) - A Wizard for Docker-based deployment of [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud)
 
 ## Contributing
 
@@ -723,10 +758,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is an independent, community-driven effort created for educational and personal use purposes.
 
-- tonies®, toniebox®, Hörfigur® are registered trademarks of [tonies GmbH](https://tonies.com).
+- tonies®, toniebox®, and Hörfigur® are registered trademarks of [tonies GmbH](https://tonies.com).
 - This project is not affiliated with, endorsed by, or connected to tonies GmbH in any way.
 - TonieToolbox is provided "as is" without warranty of any kind, either express or implied.
 - Users are responsible for ensuring their usage complies with all applicable copyright and intellectual property laws.
 - This tool is intended for personal use with legally owned content only.
 
 By using TonieToolbox, you acknowledge that the authors of this software take no responsibility for any potential misuse or any damages that might result from the use of this software.
+
+## Support
+
+If you need help, have questions, or want to report a bug, please use the following channels:
+
+- [GitHub Issues](https://github.com/Quentendo64/TonieToolbox/issues) for bug reports and feature requests
+- [GitHub Discussions](https://github.com/Quentendo64/TonieToolbox/discussions) for general questions and community support
+- [HOWTO Guide](HOWTO.md) for common usage instructions

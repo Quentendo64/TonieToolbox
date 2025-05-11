@@ -10,18 +10,17 @@ import logging
 from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
-from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files
+from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary
-from .logger import setup_logging, get_logger
+from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
-from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename
+from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
-from .tonies_json import fetch_and_update_tonies_json
+from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
-
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -52,6 +51,8 @@ def main():
                        help='Delay between retry attempts in seconds (default: 5)')
     teddycloud_group.add_argument('--create-custom-json', action='store_true',
                        help='Fetch and update custom Tonies JSON data')
+    teddycloud_group.add_argument('--version-2', action='store_true',
+                       help='Use version 2 of the Tonies JSON format (default: version 1)')
     # ------------- Parser - Authentication options for TeddyCloud -------------
     teddycloud_group.add_argument('--username', action='store', metavar='USERNAME',
                        help='Username for basic authentication')
@@ -87,6 +88,8 @@ def main():
                         help='Save output files in the source directory instead of output directory')
     parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
                         help='Force creation of Tonie file even if it already exists')
+    parser.add_argument('--no-mono-conversion', action='store_true',
+                        help='Do not convert mono audio to stereo (default: convert mono to stereo)')
     # ------------- Parser - Debug TAFs -------------
     parser.add_argument('-k', '--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
@@ -129,7 +132,6 @@ def main():
 
     # ------------- Logging -------------
     if args.trace:
-        from .logger import TRACE
         log_level = TRACE
     elif args.debug:
         log_level = logging.DEBUG
@@ -203,27 +205,36 @@ def main():
             success = get_tags(client)
             logger.debug( "Exiting with code %d", 0 if success else 1)
             sys.exit(0 if success else 1)
-            
-    # ------------- Direct Upload -------------
-        if args.upload and not args.recursive:
-            logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
-            logger.trace("TeddyCloud upload parameters: path=%s, special_folder=%s, ignore_ssl=%s", 
-                      args.path, args.special_folder, args.ignore_ssl_verify)
+    
+    # ------------- Show Media Tags -------------
+    if args.show_tags:
+        logger.info("Showing media tags for input files:")
+        
+        for file_index, file_path in enumerate(files):
+            tags = get_file_tags(file_path)
+            if tags:
+                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)}")
+                print("-" * 40)
+                for tag_name, tag_value in sorted(tags.items()):
+                    print(f"{tag_name}: {tag_value}")
+            else:
+                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)} - No tags found")
+        sys.exit(0)
+    # ------------- Direct Upload -------------    
+        if os.path.exists(args.input_filename) and os.path.isfile(args.input_filename):
+            file_path = args.input_filename
+            file_size = os.path.getsize(file_path)
+            file_ext = os.path.splitext(file_path)[1].lower()    
+    
+            if args.upload and not args.recursive and file_ext == '.taf':
+                logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
+                logger.trace("TeddyCloud upload parameters: path=%s, special_folder=%s, ignore_ssl=%s", 
+                          args.path, args.special_folder, args.ignore_ssl_verify)
 
-            if not args.input_filename:
-                logger.error("Missing input file for --upload. Provide a file path as SOURCE argument.")
-                logger.trace("Exiting with code 1 due to missing input file")
-                sys.exit(1)
 
-            if os.path.exists(args.input_filename) and os.path.isfile(args.input_filename):
-                file_path = args.input_filename
-                file_size = os.path.getsize(file_path)
-                file_ext = os.path.splitext(file_path)[1].lower()
-                
                 logger.debug("File to upload: %s (size: %d bytes, type: %s)", 
                           file_path, file_size, file_ext)
                 logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
-                
                 logger.trace("Starting upload process for %s", file_path)
                 response = client.upload_file(
                     destination_path=args.path, 
@@ -231,56 +242,59 @@ def main():
                     special=args.special_folder,
                 )
                 logger.trace("Upload response received: %s", response)
-                
                 upload_success = response.get('success', False)
                 if not upload_success:
                     error_msg = response.get('message', 'Unknown error')
-                    logger.error("Failed to upload %s to TeddyCloud: %s", file_path, error_msg)
+                    logger.error("Failed to upload %s to TeddyCloud: %s (HTTP Status: %s, Response: %s)", 
+                                 file_path, error_msg, response.get('status_code', 'Unknown'), response)
                     logger.trace("Exiting with code 1 due to upload failure")
                     sys.exit(1)
                 else:
                     logger.info("Successfully uploaded %s to TeddyCloud", file_path)
                     logger.debug("Upload response details: %s", 
                               {k: v for k, v in response.items() if k != 'success'})
-                
                 artwork_url = None
                 if args.include_artwork and file_path.lower().endswith('.taf'):
                     source_dir = os.path.dirname(file_path)
                     logger.info("Looking for artwork to upload for %s", file_path)
                     logger.debug("Searching for artwork in directory: %s", source_dir)
-                    
                     logger.trace("Calling upload_artwork function")
                     success, artwork_url = upload_artwork(client, file_path, source_dir, [])
                     logger.trace("upload_artwork returned: success=%s, artwork_url=%s", 
                               success, artwork_url)
-                    
                     if success:
                         logger.info("Successfully uploaded artwork for %s", file_path)
                         logger.debug("Artwork URL: %s", artwork_url)
                     else:
                         logger.warning("Failed to upload artwork for %s", file_path)
                         logger.debug("No suitable artwork found or upload failed")
-                
                 if args.create_custom_json and file_path.lower().endswith('.taf'):
                     output_dir = './output'
                     logger.debug("Creating/ensuring output directory for JSON: %s", output_dir)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir, exist_ok=True)
                         logger.trace("Created output directory: %s", output_dir)
-
                     logger.debug("Updating tonies.custom.json with: taf=%s, artwork_url=%s", 
                               file_path, artwork_url)
-                    success = fetch_and_update_tonies_json(client, file_path, [], artwork_url, output_dir)
+                    client_param = client
+
+                    if args.version_2:
+                        logger.debug("Using version 2 of the Tonies JSON format")
+                        success = fetch_and_update_tonies_json_v2(client_param, file_path, [], artwork_url, output_dir)
+                    else:
+                        success = fetch_and_update_tonies_json_v1(client_param, file_path, [], artwork_url, output_dir)
                     if success:
                         logger.info("Successfully updated Tonies JSON for %s", file_path)
                     else:
                         logger.warning("Failed to update Tonies JSON for %s", file_path)
                         logger.debug("fetch_and_update_tonies_json returned failure")
-                
                 logger.trace("Exiting after direct upload with code 0")
                 sys.exit(0)
             elif not args.recursive:
-                logger.error("File not found or not a regular file: %s", args.input_filename)
+                if not os.path.exists(args.input_filename):
+                    logger.error("File not found: %s", args.input_filename)
+                elif not os.path.isfile(args.input_filename):
+                    logger.error("Not a regular file: %s", args.input_filename)
                 logger.debug("File exists: %s, Is file: %s", 
                           os.path.exists(args.input_filename), 
                           os.path.isfile(args.input_filename) if os.path.exists(args.input_filename) else False)
@@ -364,10 +378,16 @@ def main():
             if not skip_creation:
                 create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
                                args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                               args.auto_download, not args.use_legacy_tags)
+                               args.auto_download, not args.use_legacy_tags, 
+                               no_mono_conversion=args.no_mono_conversion)
                 logger.info("Successfully created Tonie file: %s", task_out_filename)
             
             created_files.append(task_out_filename)
+
+    # ------------- Initialization -------------------         
+
+            artwork_url = None
+            
     # ------------- Recursive File Upload -------------       
             if args.upload:                
                 response = client.upload_file(
@@ -391,12 +411,19 @@ def main():
                         logger.warning("Failed to upload artwork for %s", task_out_filename)
                             
                     # tonies.custom.json generation
-                if args.create_custom_json:
-                    success = fetch_and_update_tonies_json(client, task_out_filename, audio_files, artwork_url, output_dir)
-                    if success:
-                        logger.info("Successfully updated Tonies JSON for %s", task_out_filename)
-                    else:
-                        logger.warning("Failed to update Tonies JSON for %s", task_out_filename)
+            if args.create_custom_json:
+                base_path = os.path.dirname(args.input_filename)
+                json_output_dir = base_path if args.output_to_source else output_dir
+                client_param = client if 'client' in locals() else None
+                if args.version_2:
+                    logger.debug("Using version 2 of the Tonies JSON format")
+                    success = fetch_and_update_tonies_json_v2(client_param, task_out_filename, audio_files, artwork_url, json_output_dir)
+                else:
+                    success = fetch_and_update_tonies_json_v1(client_param, task_out_filename, audio_files, artwork_url, json_output_dir)
+                if success:
+                    logger.info("Successfully updated Tonies JSON for %s", task_out_filename)
+                else:
+                    logger.warning("Failed to update Tonies JSON for %s", task_out_filename)
         
         logger.info("Recursive processing completed. Created %d Tonie files.", len(process_tasks))
         sys.exit(0)
@@ -415,7 +442,6 @@ def main():
             split_to_opus_files(args.input_filename, args.output_filename)
             sys.exit(0)
         elif args.compare:
-            from .tonie_analysis import compare_taf_files
             logger.info("Comparing Tonie files: %s and %s", args.input_filename, args.compare)
             result = compare_taf_files(args.input_filename, args.compare, args.detailed_compare)
             sys.exit(0 if result else 1)
@@ -426,26 +452,12 @@ def main():
     if len(files) == 0:
         logger.error("No files found for pattern %s", args.input_filename)
         sys.exit(1)
-    if args.show_tags:
-        from .media_tags import get_file_tags
-        logger.info("Showing media tags for input files:")
-        
-        for file_index, file_path in enumerate(files):
-            tags = get_file_tags(file_path)
-            if tags:
-                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)}")
-                print("-" * 40)
-                for tag_name, tag_value in sorted(tags.items()):
-                    print(f"{tag_name}: {tag_value}")
-            else:
-                print(f"\nFile {file_index + 1}: {os.path.basename(file_path)} - No tags found")
-        sys.exit(0)
+    
     guessed_name = None
     if args.use_media_tags:
         if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
             folder_path = os.path.dirname(files[0])            
-            logger.debug("Extracting album info from folder: %s", folder_path)
-            
+            logger.debug("Extracting album info from folder: %s", folder_path)            
             album_info = extract_album_info(folder_path)
             if album_info:
                 template = args.name_template or "{album} - {artist}"
@@ -457,7 +469,7 @@ def main():
                 else:
                     logger.debug("Could not format filename from album metadata")
         elif len(files) == 1:
-            from .media_tags import get_file_tags, format_metadata_filename
+
             
             tags = get_file_tags(files[0])
             if tags:
@@ -471,9 +483,7 @@ def main():
                     logger.debug("Could not format filename from file metadata")
         
         # For multiple files from different folders, try to use common tags if they exist
-        elif len(files) > 1:
-            from .media_tags import get_file_tags, format_metadata_filename
-            
+        elif len(files) > 1:            
             # Try to find common tags among files
             common_tags = {}
             for file_path in files:
@@ -547,7 +557,8 @@ def main():
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
                      args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                     args.auto_download, not args.use_legacy_tags)
+                     args.auto_download, not args.use_legacy_tags, 
+                     no_mono_conversion=args.no_mono_conversion)
     logger.info("Successfully created Tonie file: %s", out_filename)
     
     # ------------- Single File Upload -------------  
@@ -571,13 +582,19 @@ def main():
                 logger.info("Successfully uploaded artwork for %s", out_filename)
             else:
                 logger.warning("Failed to upload artwork for %s", out_filename)        
-            # tonies.custom.json generation
-        if args.create_custom_json:
-            success = fetch_and_update_tonies_json(client, out_filename, files, artwork_url)
-            if success:
-                logger.info("Successfully updated Tonies JSON for %s", out_filename)
-            else:
-                logger.warning("Failed to update Tonies JSON for %s", out_filename)
+    
+    if args.create_custom_json:
+        json_output_dir = source_dir if args.output_to_source else './output'
+        client_param = client if 'client' in locals() else None
+        if args.version_2:
+            logger.debug("Using version 2 of the Tonies JSON format")
+            success = fetch_and_update_tonies_json_v2(client_param, out_filename, files, artwork_url, json_output_dir)
+        else:
+            success = fetch_and_update_tonies_json_v1(client_param, out_filename, files, artwork_url, json_output_dir)
+        if success:
+            logger.info("Successfully updated Tonies JSON for %s", out_filename)
+        else:
+            logger.warning("Failed to update Tonies JSON for %s", out_filename)
 
 if __name__ == "__main__":
     main()
