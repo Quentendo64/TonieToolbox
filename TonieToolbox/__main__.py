@@ -88,6 +88,8 @@ def main():
                         help='Save output files in the source directory instead of output directory')
     parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
                         help='Force creation of Tonie file even if it already exists')
+    parser.add_argument('--no-mono-conversion', action='store_true',
+                        help='Do not convert mono audio to stereo (default: convert mono to stereo)')
     # ------------- Parser - Debug TAFs -------------
     parser.add_argument('-k', '--keep-temp', action='store_true', 
                        help='Keep temporary opus files in a temp folder for testing')
@@ -376,7 +378,8 @@ def main():
             if not skip_creation:
                 create_tonie_file(task_out_filename, audio_files, args.no_tonie_header, args.user_timestamp,
                                args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                               args.auto_download, not args.use_legacy_tags)
+                               args.auto_download, not args.use_legacy_tags, 
+                               no_mono_conversion=args.no_mono_conversion)
                 logger.info("Successfully created Tonie file: %s", task_out_filename)
             
             created_files.append(task_out_filename)
@@ -554,7 +557,8 @@ def main():
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
                      args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
-                     args.auto_download, not args.use_legacy_tags)
+                     args.auto_download, not args.use_legacy_tags, 
+                     no_mono_conversion=args.no_mono_conversion)
     logger.info("Successfully created Tonie file: %s", out_filename)
     
     # ------------- Single File Upload -------------  

@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Download-option with rip
+## [0.5.0] - 2025-05-11
+
+### Added
+
+- Added new handler for generating v1 tonies.custom.json
+
+### Changed
+
+- Default behaviour of --create-custom-json to create a v1 tonies.custom.json
+
+- Updated README.md with new features and usage examples
+
+### Fixed
+
+- gh-12: --name-template not working as expected
 
 ## [0.5.0a2] - 2025-05-08
 

@@ -274,6 +274,7 @@ optional arguments:
   -C, --compare FILE2   Compare input file with another .taf file for debugging
   -D, --detailed-compare
                         Show detailed OGG page differences when comparing files
+  --no-mono-conversion  Do not convert mono audio to stereo (default: convert mono to stereo)
 Media Tag Options:
   -m, --use-media-tags  Use media tags from audio files for naming
   --name-template TEMPLATE
@@ -693,10 +694,14 @@ The audio data consists of:
 
 For optimal compatibility with Tonie boxes:
 
-- Audio must be stereo (2 channels)
+- Audio should be stereo (2 channels)
 - Sample rate must be 48 kHz
 - Pages must be aligned to 4096 byte boundaries
 - Bitrate of 96 kbps VBR is recommended
+
+**Mono audio handling:**
+- By default, TonieToolbox will automatically convert mono audio files to stereo for compatibility.
+- To disable this behavior (and require your input to already be stereo), use the `--no-mono-conversion` flag.
 
 ### File Analysis
 

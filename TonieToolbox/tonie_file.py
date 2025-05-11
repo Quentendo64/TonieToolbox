@@ -15,7 +15,6 @@ from .ogg_page import OggPage
 from .constants import OPUS_TAGS, SAMPLE_RATE_KHZ, TIMESTAMP_DEDUCT
 from .logger import get_logger
 
-# Setup logging
 logger = get_logger('tonie_file')
 
 
@@ -38,7 +37,6 @@ def toniefile_comment_add(buffer, length, comment_str):
     buffer[length:length+4] = struct.pack("<I", str_length)
     length += 4
     
-    # Add the actual string
     buffer[length:length+str_length] = comment_str.encode('utf-8')
     length += str_length
     
@@ -115,49 +113,38 @@ def prepare_opus_tags(page, custom_tags=False, bitrate=64, vbr=True, opus_binary
         # Use custom tags for TonieToolbox
         # Create buffer for opus tags (similar to teddyCloud implementation)
         logger.debug("Creating custom Opus tags")
-        comment_data = bytearray(0x1B4)  # Same size as in teddyCloud
-        
-        # OpusTags signature
+        comment_data = bytearray(0x1B4)
         comment_data_pos = 0
         comment_data[comment_data_pos:comment_data_pos+8] = b"OpusTags"
-        comment_data_pos += 8
-        
+        comment_data_pos += 8        
         # Vendor string
-        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, "TonieToolbox")
-        
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, "TonieToolbox")        
         # Number of comments (3 comments: version, encoder info, and encoder options)
         comments_count = 3
         comment_data[comment_data_pos:comment_data_pos+4] = struct.pack("<I", comments_count)
-        comment_data_pos += 4
-        
+        comment_data_pos += 4        
         # Add version information
         from . import __version__
         version_str = f"version={__version__}"
-        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, version_str)
-        
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, version_str)        
         # Get actual opusenc version
         from .dependency_manager import get_opus_version
         encoder_info = get_opus_version(opus_binary)
-        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, f"encoder={encoder_info}")
-        
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, f"encoder={encoder_info}")        
         # Create encoder options string with actual settings
         vbr_opt = "--vbr" if vbr else "--cbr"
         encoder_options = f"encoder_options=--bitrate {bitrate} {vbr_opt}"
-        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, encoder_options)
-        
+        comment_data_pos = toniefile_comment_add(comment_data, comment_data_pos, encoder_options)        
         # Add padding
         remain = len(comment_data) - comment_data_pos - 4
         comment_data[comment_data_pos:comment_data_pos+4] = struct.pack("<I", remain)
         comment_data_pos += 4
-        comment_data[comment_data_pos:comment_data_pos+4] = b"pad="
-        
+        comment_data[comment_data_pos:comment_data_pos+4] = b"pad="        
         # Create segments - handle data in chunks of 255 bytes maximum
-        comment_data = comment_data[:comment_data_pos + remain]  # Trim to actual used size
-        
+        comment_data = comment_data[:comment_data_pos + remain]  # Trim to actual used size        
         # Split large data into smaller segments (each <= 255 bytes)
         remaining_data = comment_data
-        first_segment = True
-        
+        first_segment = True        
         while remaining_data:
             chunk_size = min(255, len(remaining_data))
             segment = OpusPacket(None)
@@ -377,7 +364,7 @@ def fix_tonie_header(out_file, chapters, timestamp, sha):
 
 def create_tonie_file(output_file, input_files, no_tonie_header=False, user_timestamp=None,
                      bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False, auto_download=False, 
-                     use_custom_tags=True):
+                     use_custom_tags=True, no_mono_conversion=False):
     """
     Create a Tonie file from input files.
     
@@ -393,13 +380,14 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
         keep_temp: Whether to keep temporary opus files for testing
         auto_download: Whether to automatically download dependencies if not found
         use_custom_tags: Whether to use dynamic comment tags generated with toniefile_comment_add
+        no_mono_conversion: Whether to skip mono conversion during audio processing
     """
     from .audio_conversion import get_opus_tempfile
     
     logger.trace("Entering create_tonie_file(output_file=%s, input_files=%s, no_tonie_header=%s, user_timestamp=%s, "
-                "bitrate=%d, vbr=%s, ffmpeg_binary=%s, opus_binary=%s, keep_temp=%s, auto_download=%s, use_custom_tags=%s)",
+                "bitrate=%d, vbr=%s, ffmpeg_binary=%s, opus_binary=%s, keep_temp=%s, auto_download=%s, use_custom_tags=%s, no_mono_conversion=%s)",
                 output_file, input_files, no_tonie_header, user_timestamp, bitrate, vbr, ffmpeg_binary, 
-                opus_binary, keep_temp, auto_download, use_custom_tags)
+                opus_binary, keep_temp, auto_download, use_custom_tags, no_mono_conversion)
     
     logger.info("Creating Tonie file from %d input files", len(input_files))
     logger.debug("Output file: %s, Bitrate: %d kbps, VBR: %s, No header: %s", 
@@ -465,9 +453,9 @@ def create_tonie_file(output_file, input_files, no_tonie_header=False, user_time
                 handle = open(fname, "rb")
                 temp_file_path = None
             else:
-                logger.debug("Converting %s to Opus format (bitrate: %d kbps, VBR: %s)", 
-                            fname, bitrate, vbr)
-                handle, temp_file_path = get_opus_tempfile(ffmpeg_binary, opus_binary, fname, bitrate, vbr, keep_temp, auto_download)
+                logger.debug("Converting %s to Opus format (bitrate: %d kbps, VBR: %s, no_mono_conversion: %s)", 
+                            fname, bitrate, vbr, no_mono_conversion)
+                handle, temp_file_path = get_opus_tempfile(ffmpeg_binary, opus_binary, fname, bitrate, vbr, keep_temp, auto_download, no_mono_conversion=no_mono_conversion)
                 if temp_file_path:
                     temp_files.append(temp_file_path)
                     logger.debug("Temporary opus file saved to: %s", temp_file_path)
