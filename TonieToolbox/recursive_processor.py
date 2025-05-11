@@ -217,14 +217,10 @@ def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False
     Returns:
         String with cleaned output name
     """
-    # Start with folder name metadata
     folder_meta = extract_folder_meta(folder_path)
-    output_name = None
-    
-    # Try to get metadata from audio files if requested
+    output_name = None    
     if use_media_tags:
         try:
-            # Import here to avoid circular imports
             from .media_tags import extract_album_info, format_metadata_filename, is_available, normalize_tag_value
             
             if is_available():
@@ -247,12 +243,15 @@ def get_folder_name_from_metadata(folder_path: str, use_media_tags: bool = False
                         if 'album' not in album_info or not album_info['album']:
                             album_info['album'] = normalize_tag_value(folder_meta['title'])
                     
-                    # Use template or default format
-                    format_template = template or "{album}"
-                    if 'artist' in album_info and album_info['artist']:
-                        format_template = format_template + " - {artist}"
-                    if 'number' in folder_meta and folder_meta['number']:
-                        format_template = "{tracknumber} - " + format_template
+                    if template:
+                        format_template = template
+                        logger.debug("Using provided name template: %s", format_template)
+                    else:                    
+                        format_template = "{album}"
+                        if 'artist' in album_info and album_info['artist']:
+                            format_template = format_template + " - {artist}"
+                        if 'number' in folder_meta and folder_meta['number']:
+                            format_template = "{tracknumber} - " + format_template
                     
                     formatted_name = format_metadata_filename(album_info, format_template)
                     

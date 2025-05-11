@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Download-option with rip
 
+## [0.5.0a2] - 2025-05-08
+
+### Changed
+
+- Updated README.md with new features and usage examples
+- Updated HOWTO.md with new features and usage examples
+- Updated version handler to check for new releases on GitHub
+- Direct Upload to TeddyCloud now only works with .TAF files
+
 ## [0.5.0a1] - 2025-05-07
 
 ### Added
