@@ -267,6 +267,7 @@ def get_file_tags(file_path: str) -> Dict[str, Any]:
                         tags[TAG_MAPPING[tag_key_lower]] = normalize_tag_value(tag_value_str)
                         
         logger.debug("Successfully read %d tags from file", len(tags))
+        logger.debug("Tags: %s", str(tags))
         return tags
     except Exception as e:
         logger.error("Error reading tags from file %s: %s", file_path, str(e))
@@ -330,12 +331,12 @@ def extract_album_info(folder_path: str) -> Dict[str, str]:
     if not all_tags:
         logger.debug("Could not read tags from any files in folder")
         return {}
-    
-    # Try to find consistent album information
     result = {}
-    key_tags = ['album', 'albumartist', 'artist', 'date', 'genre']
+    all_tag_names = set()
+    for tags in all_tags:
+        all_tag_names.update(tags.keys())
     
-    for tag_name in key_tags:
+    for tag_name in all_tag_names:
         # Count occurrences of each value
         value_counts = {}
         for tags in all_tags:
