@@ -7,6 +7,7 @@ import glob
 import subprocess
 import tempfile
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary
+from .constants import SUPPORTED_EXTENSIONS
 from .logger import get_logger
 
 logger = get_logger('audio_conversion')
@@ -218,11 +219,8 @@ def filter_directories(glob_list: list[str]) -> list[str]:
     logger.trace("Entering filter_directories() with %d items", len(glob_list))
     logger.debug("Filtering %d glob results for supported audio files", len(glob_list))
     
-    # Common audio file extensions supported by ffmpeg
-    supported_extensions = [
-        '.wav', '.mp3', '.aac', '.m4a', '.flac', '.ogg', '.opus',
-        '.ape', '.wma', '.aiff', '.mp2', '.mp4', '.webm', '.mka'
-    ]
+    supported_extensions = SUPPORTED_EXTENSIONS
+    logger.debug("Supported audio file extensions: %s", supported_extensions)
     
     filtered = []
     for name in glob_list:

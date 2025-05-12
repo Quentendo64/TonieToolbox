@@ -88,3 +88,10 @@ GENRE_MAPPING: dict[str, str] = {
     # Default to standard format for custom
     'custom': 'Hörspiele & Hörbücher',
 }
+
+    # Supported file extensions for audio files
+SUPPORTED_EXTENSIONS = [
+        '.wav', '.mp3', '.aac', '.m4a', '.flac', '.ogg', '.opus',
+        '.ape', '.wma', '.aiff', '.mp2', '.mp4', '.webm', '.mka'
+    ]
+
