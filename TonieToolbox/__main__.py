@@ -292,22 +292,8 @@ def main():
                     logger.warning("Failed to update Tonies JSON for %s", file_path)
                     logger.debug("fetch_and_update_tonies_json returned failure")
             logger.trace("Exiting after direct upload with code 0")
-            sys.exit(0)
-        elif not args.recursive:
-            if not os.path.exists(args.input_filename):
-                logger.error("File not found: %s", args.input_filename)
-            elif not os.path.isfile(args.input_filename):
-                logger.error("Not a regular file: %s", args.input_filename)
-            logger.debug("File exists: %s, Is file: %s", 
-                      os.path.exists(args.input_filename), 
-                      os.path.isfile(args.input_filename) if os.path.exists(args.input_filename) else False)
-            logger.trace("Exiting with code 1 due to invalid input file")
-            sys.exit(1)
+            sys.exit(0)        
     
-    if args.recursive and args.upload:
-        logger.info("Recursive mode with upload enabled: %s -> %s", args.input_filename, teddycloud_url)
-        logger.debug("Will process all files in directory recursively and upload to TeddyCloud")
-
     # ------------- Librarys / Prereqs -------------
     logger.debug("Checking for external dependencies")
     ffmpeg_binary = args.ffmpeg
