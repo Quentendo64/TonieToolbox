@@ -18,6 +18,8 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+test*.py
+*.bak
 
 # Development environment files
 .vscode/
