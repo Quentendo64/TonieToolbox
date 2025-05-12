@@ -2,7 +2,7 @@
 import os
 import sys
 import json
-from .constants import SUPPORTED_EXTENSIONS
+from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE
 from .logger import get_logger
 
 logger = get_logger('integration_windows')
@@ -24,8 +24,7 @@ class WindowsClassicContextMenuIntegration:
         self.separator_above = '"CommandFlags"=dword:00000020'
         self.error_handling = r' && if %ERRORLEVEL% neq 0 (echo Error: Command failed with error code %ERRORLEVEL% && pause && exit /b %ERRORLEVEL%) else (echo Command completed successfully && ping -n 2 127.0.0.1 > nul)'
         self.show_info_error_handling = r' && if %ERRORLEVEL% neq 0 (echo Error: Command failed with error code %ERRORLEVEL% && pause && exit /b %ERRORLEVEL%) else (echo. && echo Press any key to close this window... && pause > nul)'
-        self.config = self._load_config()
-        # Ensure these attributes always exist
+        self.config = self._apply_config_template()
         self.upload_url = ''
         self.log_level = self.config.get('log_level', 'SILENT')
         self.log_to_file = self.config.get('log_to_file', False)
@@ -126,6 +125,18 @@ class WindowsClassicContextMenuIntegration:
         self.upload_folder_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, log_to_file=self.log_to_file)
         self.upload_folder_artwork_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, log_to_file=self.log_to_file)
         self.upload_folder_artwork_json_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, use_json=True, log_to_file=self.log_to_file)
+
+    def _apply_config_template(self):
+        """Apply the default configuration template if config.json is missing or invalid."""
+        config_path = os.path.join(self.output_dir, 'config.json')
+        if not os.path.exists(config_path):
+            with open(config_path, 'w') as f:
+                json.dump(CONFIG_TEMPLATE, f, indent=4)
+            logger.debug(f"Default configuration created at {config_path}")
+            return CONFIG_TEMPLATE
+        else:
+            logger.debug(f"Configuration file found at {config_path}")
+            return self._load_config()
 
     def _load_config(self):
         """Load configuration settings from config.json"""
@@ -360,11 +371,14 @@ class WindowsClassicContextMenuIntegration:
             f.write('\n'.join(unreg_lines))
         
         return reg_path
-
+        
     def install_registry_files(self, uninstall=False):
         """
         Import the generated .reg file into the Windows registry with UAC elevation.
         If uninstall is True, imports the uninstaller .reg file.
+        
+        Returns:
+            bool: True if registry import was successful, False otherwise.
         """
         import subprocess
         reg_file = os.path.join(
@@ -372,18 +386,27 @@ class WindowsClassicContextMenuIntegration:
             'remove_tonietoolbox_context.reg' if uninstall else 'tonietoolbox_context.reg'
         )
         if not os.path.exists(reg_file):
-            raise FileNotFoundError(f"Registry file not found: {reg_file}")
+            logger.error(f"Registry file not found: {reg_file}")
+            return False
     
-        # Use PowerShell to run reg.exe import as administrator (fix argument passing)
         ps_command = (
-            f"Start-Process reg.exe -ArgumentList @('import', '{reg_file}') -Verb RunAs"
+            f"Start-Process reg.exe -ArgumentList @('import', '{reg_file}') -Verb RunAs -Wait -PassThru"
         )
         try:
-            subprocess.run(["powershell.exe", "-Command", ps_command], check=True)
-            print(f"{'Uninstallation' if uninstall else 'Installation'} registry import completed.")
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to import registry file: {e}")
-            raise
+            result = subprocess.run(["powershell.exe", "-Command", ps_command], check=False, 
+                                   capture_output=True, text=True)
+                        
+            if result.returncode == 0:
+                logger.info(f"{'Uninstallation' if uninstall else 'Installation'} registry import completed.")
+                return True
+            else:
+                logger.error(f"Registry import command failed with return code {result.returncode}")
+                logger.error(f"STDERR: {result.stderr}")
+                return False
+                
+        except subprocess.SubprocessError as e:
+            logger.error(f"Failed to import registry file: {e}")
+            return False
 
     @classmethod
     def install(cls):
@@ -392,7 +415,12 @@ class WindowsClassicContextMenuIntegration:
         """
         instance = cls()
         instance.generate_registry_files()
-        instance.install_registry_files(uninstall=False)
+        if instance.install_registry_files(uninstall=False):
+            logger.info("Integration installed successfully.")
+            return True
+        else:
+            logger.error("Integration installation failed.")
+            return False
 
     @classmethod
     def uninstall(cls):
@@ -401,4 +429,9 @@ class WindowsClassicContextMenuIntegration:
         """
         instance = cls()
         instance.generate_registry_files()
-        instance.install_registry_files(uninstall=True)
+        if instance.install_registry_files(uninstall=True):
+            logger.info("Integration uninstalled successfully.")
+            return True
+        else:
+            logger.error("Integration uninstallation failed.")
+            return False

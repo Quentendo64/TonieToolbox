@@ -172,3 +172,20 @@ TAG_MAPPINGS = {
     'interpret': 'artist',            # German tag name
 
 }
+
+CONFIG_TEMPLATE = {
+    "metadata": {
+        "description": "TonieToolbox configuration",
+        "config_version": "1.0"     
+    },
+    "log_level": "silent", # Options: trace, debug, info, warning, error, critical, silent
+    "log_to_file": False, # True if you want to log to a file ~\.tonietoolbox\logs
+    "upload": {
+        "url": [""], # https://teddycloud.example.com        
+        "ignore_ssl_verify": False, # True if you want to ignore SSL certificate verification
+        "username": "", # Basic Auth username
+        "password": "", # Basic Auth password
+        "client_cert_path": "", # Path to client certificate file
+        "client_cert_key_path": "" # Path to client certificate key file
+    }
+}

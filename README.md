@@ -192,7 +192,7 @@ docker run --rm -v "$(pwd)/input:/tonietoolbox/input" -v "$(pwd)/output:/tonieto
 docker run --rm -v "%cd%\input:/tonietoolbox/input" -v "%cd%\output:/tonietoolbox/output" quentendo64/tonietoolbox input/my-audio-file.mp3
 ```
 
-**Or using docker-compose**
+**Or using docker-compose:**
 
 ```shell
 docker-compose run --rm tonietoolbox input/my-audio-file.mp3

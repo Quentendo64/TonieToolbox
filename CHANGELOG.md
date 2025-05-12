@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0a2] - 2025-05-12
+
+### Added
+
+- Context menu integration for Windows using --install-integration / --uninstall-integration
+- Advanced context menu configuration using --config-integration after installation
+
 ## [0.6.0a1] - 2025-05-12
 
 ### Added

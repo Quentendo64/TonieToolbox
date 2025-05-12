@@ -5,7 +5,7 @@ import json
 import plistlib
 import subprocess
 from pathlib import Path
-from .constants import SUPPORTED_EXTENSIONS
+from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE
 from .logger import get_logger
 
 logger = get_logger('integration_macos')
@@ -28,7 +28,7 @@ class MacOSContextMenuIntegration:
         self.success_handling = 'echo "Command completed successfully"\nsleep 2'
         
         # Load configuration
-        self.config = self._load_config()
+        self.config = self._apply_config_template()
         
         # Ensure these attributes always exist
         self.upload_url = ''
@@ -145,6 +145,18 @@ class MacOSContextMenuIntegration:
         self.upload_folder_artwork_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, log_to_file=self.log_to_file)
         self.upload_folder_artwork_json_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, use_json=True, log_to_file=self.log_to_file)
 
+    def _apply_config_template(self):
+        """Apply the default configuration template if config.json is missing or invalid."""
+        config_path = os.path.join(self.output_dir, 'config.json')
+        if not os.path.exists(config_path):
+            with open(config_path, 'w') as f:
+                json.dump(CONFIG_TEMPLATE, f, indent=4)
+            logger.debug(f"Default configuration created at {config_path}")
+            return CONFIG_TEMPLATE
+        else:
+            logger.debug(f"Configuration file found at {config_path}")
+            return self._load_config()
+            
     def _load_config(self):
         """Load configuration settings from config.json"""
         config_path = os.path.join(self.output_dir, 'config.json')
@@ -371,58 +383,95 @@ class MacOSContextMenuIntegration:
                 "TonieToolbox - Convert Folder, Upload with Artwork and JSON (recursive)",
                 self.upload_folder_artwork_json_cmd,
                 directory_based=True
-            )
-
+            )    
+    
     def install_quick_actions(self):
-        """Install all Quick Actions."""
-        # Ensure Services directory exists
-        os.makedirs(self.services_dir, exist_ok=True)
+        """
+        Install all Quick Actions.
         
-        # Check if the icon exists, copy default if needed
-        if not os.path.exists(self.icon_path):
-            # Include code to extract icon from resources
-            logger.debug(f"Icon not found at {self.icon_path}, using default")
-        
-        # Generate Quick Actions for different file types
-        self._generate_audio_extension_actions()
-        self._generate_taf_file_actions()
-        self._generate_folder_actions()
-        
-        # Refresh the Services menu by restarting the Finder
-        subprocess.run(["killall", "-HUP", "Finder"], check=False)
-        
-        print("TonieToolbox Quick Actions installed successfully.")
-        print("You'll find them in the Services menu when right-clicking on audio files, TAF files, or folders.")
+        Returns:
+            bool: True if all actions were installed successfully, False otherwise.
+        """
+        try:
+            # Ensure Services directory exists
+            os.makedirs(self.services_dir, exist_ok=True)
+            
+            # Check if the icon exists, copy default if needed
+            if not os.path.exists(self.icon_path):
+                # Include code to extract icon from resources
+                logger.debug(f"Icon not found at {self.icon_path}, using default")
+            
+            # Generate Quick Actions for different file types
+            self._generate_audio_extension_actions()
+            self._generate_taf_file_actions()
+            self._generate_folder_actions()
+            
+            # Refresh the Services menu by restarting the Finder
+            result = subprocess.run(["killall", "-HUP", "Finder"], check=False, 
+                                   capture_output=True, text=True)
+            
+            print("TonieToolbox Quick Actions installed successfully.")
+            print("You'll find them in the Services menu when right-clicking on audio files, TAF files, or folders.")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to install Quick Actions: {e}")
+            return False
 
     def uninstall_quick_actions(self):
-        """Uninstall all TonieToolbox Quick Actions."""
-        # Find and remove all TonieToolbox Quick Actions
-        for item in os.listdir(self.services_dir):
-            if item.startswith("TonieToolbox - ") and item.endswith(".workflow"):
-                action_path = os.path.join(self.services_dir, item)
-                try:
-                    subprocess.run(["rm", "-rf", action_path], check=True)
-                    print(f"Removed: {item}")
-                except subprocess.CalledProcessError:
-                    print(f"Failed to remove: {item}")
+        """
+        Uninstall all TonieToolbox Quick Actions.
         
-        # Refresh the Services menu
-        subprocess.run(["killall", "-HUP", "Finder"], check=False)
-        
-        print("TonieToolbox Quick Actions uninstalled successfully.")
-
-    @classmethod
+        Returns:
+            bool: True if all actions were uninstalled successfully, False otherwise.
+        """
+        try:
+            any_failures = False
+            for item in os.listdir(self.services_dir):
+                if item.startswith("TonieToolbox - ") and item.endswith(".workflow"):
+                    action_path = os.path.join(self.services_dir, item)
+                    try:
+                        subprocess.run(["rm", "-rf", action_path], check=True)
+                        print(f"Removed: {item}")
+                    except subprocess.CalledProcessError as e:
+                        print(f"Failed to remove: {item}")
+                        logger.error(f"Error removing {item}: {e}")
+                        any_failures = True            
+            subprocess.run(["killall", "-HUP", "Finder"], check=False)
+            
+            print("TonieToolbox Quick Actions uninstalled successfully.")
+            
+            return not any_failures
+        except Exception as e:
+            logger.error(f"Failed to uninstall Quick Actions: {e}")
+            return False    @classmethod
     def install(cls):
         """
         Generate Quick Actions and install them.
+        
+        Returns:
+            bool: True if installation was successful, False otherwise.
         """
         instance = cls()
-        instance.install_quick_actions()
+        if instance.install_quick_actions():
+            logger.info("macOS integration installed successfully.")
+            return True
+        else:
+            logger.error("macOS integration installation failed.")
+            return False
 
     @classmethod
     def uninstall(cls):
         """
         Uninstall all TonieToolbox Quick Actions.
+        
+        Returns:
+            bool: True if uninstallation was successful, False otherwise.
         """
         instance = cls()
-        instance.uninstall_quick_actions()
+        if instance.uninstall_quick_actions():
+            logger.info("macOS integration uninstalled successfully.")
+            return True
+        else:
+            logger.error("macOS integration uninstallation failed.")
+            return False

@@ -21,7 +21,7 @@ from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
-from .integration import handle_integration
+from .integration import handle_integration, handle_config
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -101,6 +101,8 @@ def main():
     parser.add_argument('-D', '--detailed-compare', action='store_true',
                        help='Show detailed OGG page differences when comparing files')  
     # ------------- Parser - Context Menu Integration -------------
+    parser.add_argument('--config-integration', action='store_true',
+                       help='Configure context menu integration')
     parser.add_argument('--install-integration', action='store_true',
                        help='Integrate with the system (e.g., create context menu entries)')
     parser.add_argument('--uninstall-integration', action='store_true',
@@ -133,7 +135,7 @@ def main():
     args = parser.parse_args()
     
     # ------------- Parser - Source Input -------------
-    if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration):
+    if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration or args.config_integration):
         parser.error("the following arguments are required: SOURCE")
 
     # ------------- Logging -------------
@@ -184,6 +186,10 @@ def main():
                 logger.info("Context menu integration uninstalled successfully")
         else:
             logger.error("Failed to handle context menu integration")
+        sys.exit(0)
+    if args.config_integration:
+        logger.debug("Opening configuration file for editing")
+        handle_config()
         sys.exit(0)
         # ------------- Normalize Path Input -------------
     if args.input_filename:
