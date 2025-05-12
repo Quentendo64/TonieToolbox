@@ -29,7 +29,7 @@ def get_log_file_path() -> Path:
         Path: Path to the log file
     """
     # Create .tonietoolbox folder in user's home directory if it doesn't exist
-    log_dir = Path.home() / '.tonietoolbox'
+    log_dir = Path.home() / '.tonietoolbox' / 'logs'
     log_dir.mkdir(exist_ok=True)
     
     # Create timestamp string for the filename

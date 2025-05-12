@@ -21,6 +21,7 @@ from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
+from .integration import handle_integration
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -100,8 +101,10 @@ def main():
     parser.add_argument('-D', '--detailed-compare', action='store_true',
                        help='Show detailed OGG page differences when comparing files')  
     # ------------- Parser - Context Menu Integration -------------
-    parser.add_argument('--integrate', action='store_true',
+    parser.add_argument('--install-integration', action='store_true',
                        help='Integrate with the system (e.g., create context menu entries)')
+    parser.add_argument('--uninstall-integration', action='store_true',
+                       help='Uninstall context menu integration')
     # ------------- Parser - Media Tag Options -------------
     media_tag_group = parser.add_argument_group('Media Tag Options')
     media_tag_group.add_argument('-m', '--use-media-tags', action='store_true',
@@ -130,7 +133,7 @@ def main():
     args = parser.parse_args()
     
     # ------------- Parser - Source Input -------------
-    if args.input_filename is None and not (args.get_tags or args.upload):
+    if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration):
         parser.error("the following arguments are required: SOURCE")
 
     # ------------- Logging -------------
@@ -169,7 +172,19 @@ def main():
         
         if not is_latest and not update_confirmed and not (args.silent or args.quiet):
             logger.info("Update available but user chose to continue without updating.")
-
+    # ------------- Context Menu Integration -------------
+    if args.install_integration or args.uninstall_integration:
+        logger.debug("Context menu integration requested: install=%s, uninstall=%s", 
+                  args.install_integration, args.uninstall_integration)
+        success = handle_integration(args)
+        if success:
+            if args.install_integration:
+                logger.info("Context menu integration installed successfully")
+            else:
+                logger.info("Context menu integration uninstalled successfully")
+        else:
+            logger.error("Failed to handle context menu integration")
+        sys.exit(0)
         # ------------- Normalize Path Input -------------
     if args.input_filename:
         logger.debug("Original input path: %s", args.input_filename)

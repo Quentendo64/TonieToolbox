@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0a1] - 2025-05-12
+
+### Added
+
+- *WIP* Context menu integration for Windows
+- *WIP* Context menu integration for Linux
+- *WIP* Context menu integration for MacOS
+
+### Changed
+
+- Logging to subdirectory `~/.tonietoolbox/logs`
+
 ## [0.5.1] - 2025-05-12
 
 ### Fixed
