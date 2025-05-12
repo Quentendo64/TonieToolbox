@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2025-05-12
+
+### Fixed
+
+- gh-17: Fixed issue with --show-tags not displaying correctly
+
+### Changed
+
+- Adjusted get_input_files() for better handling of file types
+
 ## [0.5.0] - 2025-05-11
 
 ### Added

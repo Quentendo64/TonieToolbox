@@ -287,9 +287,34 @@ def get_input_files(input_filename):
         
         logger.debug("Found %d files in list file", len(input_files))
     else:
-        logger.debug("Processing glob pattern: %s", input_filename)
+        logger.debug("Processing input path: %s", input_filename)
+        
+        # Try the exact pattern first
         input_files = sorted(filter_directories(glob.glob(input_filename)))
-        logger.debug("Found %d files matching pattern", len(input_files))
+        if input_files:
+            logger.debug("Found %d files matching exact pattern", len(input_files))
+        else:
+            # If no extension is provided, try appending a wildcard for extension
+            _, ext = os.path.splitext(input_filename)
+            if not ext:
+                wildcard_pattern = input_filename + ".*"
+                logger.debug("No extension in pattern, trying with wildcard: %s", wildcard_pattern)
+                input_files = sorted(filter_directories(glob.glob(wildcard_pattern)))
+                
+                # If still no files found, try treating it as a directory
+                if not input_files and os.path.exists(os.path.dirname(input_filename)):
+                    potential_dir = input_filename
+                    if os.path.isdir(potential_dir):
+                        logger.debug("Treating input as directory: %s", potential_dir)
+                        dir_glob = os.path.join(potential_dir, "*")
+                        input_files = sorted(filter_directories(glob.glob(dir_glob)))
+                        if input_files:
+                            logger.debug("Found %d audio files in directory", len(input_files))
+                
+                if input_files:
+                    logger.debug("Found %d files after trying alternatives", len(input_files))
+                else:
+                    logger.warning("No files found for pattern %s even after trying alternatives", input_filename)
     
     logger.trace("Exiting get_input_files() with %d files", len(input_files))
     return input_files

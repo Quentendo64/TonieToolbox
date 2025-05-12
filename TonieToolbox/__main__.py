@@ -208,8 +208,11 @@ def main():
     
     # ------------- Show Media Tags -------------
     if args.show_tags:
-        logger.info("Showing media tags for input files:")
-        
+        files = get_input_files(args.input_filename)
+        logger.debug("Found %d files to process", len(files))
+        if len(files) == 0:
+            logger.error("No files found for pattern %s", args.input_filename)
+            sys.exit(1)
         for file_index, file_path in enumerate(files):
             tags = get_file_tags(file_path)
             if tags:
