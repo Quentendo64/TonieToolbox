@@ -98,7 +98,10 @@ def main():
     parser.add_argument('-C', '--compare', action='store', metavar='FILE2', 
                        help='Compare input file with another .taf file for debugging')
     parser.add_argument('-D', '--detailed-compare', action='store_true',
-                       help='Show detailed OGG page differences when comparing files')    
+                       help='Show detailed OGG page differences when comparing files')  
+    # ------------- Parser - Context Menu Integration -------------
+    parser.add_argument('--integrate', action='store_true',
+                       help='Integrate with the system (e.g., create context menu entries)')
     # ------------- Parser - Media Tag Options -------------
     media_tag_group = parser.add_argument_group('Media Tag Options')
     media_tag_group.add_argument('-m', '--use-media-tags', action='store_true',
@@ -224,90 +227,87 @@ def main():
                 print(f"\nFile {file_index + 1}: {os.path.basename(file_path)} - No tags found")
         sys.exit(0)
     # ------------- Direct Upload -------------    
-        if os.path.exists(args.input_filename) and os.path.isfile(args.input_filename):
-            file_path = args.input_filename
-            file_size = os.path.getsize(file_path)
-            file_ext = os.path.splitext(file_path)[1].lower()    
-    
-            if args.upload and not args.recursive and file_ext == '.taf':
-                logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
-                logger.trace("TeddyCloud upload parameters: path=%s, special_folder=%s, ignore_ssl=%s", 
-                          args.path, args.special_folder, args.ignore_ssl_verify)
+    if os.path.exists(args.input_filename) and os.path.isfile(args.input_filename):
+        file_path = args.input_filename
+        file_size = os.path.getsize(file_path)
+        file_ext = os.path.splitext(file_path)[1].lower()    
 
-
-                logger.debug("File to upload: %s (size: %d bytes, type: %s)", 
-                          file_path, file_size, file_ext)
-                logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
-                logger.trace("Starting upload process for %s", file_path)
-                response = client.upload_file(
-                    destination_path=args.path, 
-                    file_path=file_path,                   
-                    special=args.special_folder,
-                )
-                logger.trace("Upload response received: %s", response)
-                upload_success = response.get('success', False)
-                if not upload_success:
-                    error_msg = response.get('message', 'Unknown error')
-                    logger.error("Failed to upload %s to TeddyCloud: %s (HTTP Status: %s, Response: %s)", 
-                                 file_path, error_msg, response.get('status_code', 'Unknown'), response)
-                    logger.trace("Exiting with code 1 due to upload failure")
-                    sys.exit(1)
-                else:
-                    logger.info("Successfully uploaded %s to TeddyCloud", file_path)
-                    logger.debug("Upload response details: %s", 
-                              {k: v for k, v in response.items() if k != 'success'})
-                artwork_url = None
-                if args.include_artwork and file_path.lower().endswith('.taf'):
-                    source_dir = os.path.dirname(file_path)
-                    logger.info("Looking for artwork to upload for %s", file_path)
-                    logger.debug("Searching for artwork in directory: %s", source_dir)
-                    logger.trace("Calling upload_artwork function")
-                    success, artwork_url = upload_artwork(client, file_path, source_dir, [])
-                    logger.trace("upload_artwork returned: success=%s, artwork_url=%s", 
-                              success, artwork_url)
-                    if success:
-                        logger.info("Successfully uploaded artwork for %s", file_path)
-                        logger.debug("Artwork URL: %s", artwork_url)
-                    else:
-                        logger.warning("Failed to upload artwork for %s", file_path)
-                        logger.debug("No suitable artwork found or upload failed")
-                if args.create_custom_json and file_path.lower().endswith('.taf'):
-                    output_dir = './output'
-                    logger.debug("Creating/ensuring output directory for JSON: %s", output_dir)
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir, exist_ok=True)
-                        logger.trace("Created output directory: %s", output_dir)
-                    logger.debug("Updating tonies.custom.json with: taf=%s, artwork_url=%s", 
-                              file_path, artwork_url)
-                    client_param = client
-
-                    if args.version_2:
-                        logger.debug("Using version 2 of the Tonies JSON format")
-                        success = fetch_and_update_tonies_json_v2(client_param, file_path, [], artwork_url, output_dir)
-                    else:
-                        success = fetch_and_update_tonies_json_v1(client_param, file_path, [], artwork_url, output_dir)
-                    if success:
-                        logger.info("Successfully updated Tonies JSON for %s", file_path)
-                    else:
-                        logger.warning("Failed to update Tonies JSON for %s", file_path)
-                        logger.debug("fetch_and_update_tonies_json returned failure")
-                logger.trace("Exiting after direct upload with code 0")
-                sys.exit(0)
-            elif not args.recursive:
-                if not os.path.exists(args.input_filename):
-                    logger.error("File not found: %s", args.input_filename)
-                elif not os.path.isfile(args.input_filename):
-                    logger.error("Not a regular file: %s", args.input_filename)
-                logger.debug("File exists: %s, Is file: %s", 
-                          os.path.exists(args.input_filename), 
-                          os.path.isfile(args.input_filename) if os.path.exists(args.input_filename) else False)
-                logger.trace("Exiting with code 1 due to invalid input file")
+        if args.upload and not args.recursive and file_ext == '.taf':
+            logger.debug("Upload to TeddyCloud requested: %s", teddycloud_url)
+            logger.trace("TeddyCloud upload parameters: path=%s, special_folder=%s, ignore_ssl=%s", 
+                      args.path, args.special_folder, args.ignore_ssl_verify)
+            logger.debug("File to upload: %s (size: %d bytes, type: %s)", 
+                      file_path, file_size, file_ext)
+            logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
+            logger.trace("Starting upload process for %s", file_path)
+            response = client.upload_file(
+                destination_path=args.path, 
+                file_path=file_path,                   
+                special=args.special_folder,
+            )
+            logger.trace("Upload response received: %s", response)
+            upload_success = response.get('success', False)
+            if not upload_success:
+                error_msg = response.get('message', 'Unknown error')
+                logger.error("Failed to upload %s to TeddyCloud: %s (HTTP Status: %s, Response: %s)", 
+                             file_path, error_msg, response.get('status_code', 'Unknown'), response)
+                logger.trace("Exiting with code 1 due to upload failure")
                 sys.exit(1)
-        
-        if args.recursive and args.upload:
-            logger.info("Recursive mode with upload enabled: %s -> %s", args.input_filename, teddycloud_url)
-            logger.debug("Will process all files in directory recursively and upload to TeddyCloud")
+            else:
+                logger.info("Successfully uploaded %s to TeddyCloud", file_path)
+                logger.debug("Upload response details: %s", 
+                          {k: v for k, v in response.items() if k != 'success'})
+            artwork_url = None
+            if args.include_artwork and file_path.lower().endswith('.taf'):
+                source_dir = os.path.dirname(file_path)
+                logger.info("Looking for artwork to upload for %s", file_path)
+                logger.debug("Searching for artwork in directory: %s", source_dir)
+                logger.trace("Calling upload_artwork function")
+                success, artwork_url = upload_artwork(client, file_path, source_dir, [])
+                logger.trace("upload_artwork returned: success=%s, artwork_url=%s", 
+                          success, artwork_url)
+                if success:
+                    logger.info("Successfully uploaded artwork for %s", file_path)
+                    logger.debug("Artwork URL: %s", artwork_url)
+                else:
+                    logger.warning("Failed to upload artwork for %s", file_path)
+                    logger.debug("No suitable artwork found or upload failed")
+            if args.create_custom_json and file_path.lower().endswith('.taf'):
+                output_dir = './output'
+                logger.debug("Creating/ensuring output directory for JSON: %s", output_dir)
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir, exist_ok=True)
+                    logger.trace("Created output directory: %s", output_dir)
+                logger.debug("Updating tonies.custom.json with: taf=%s, artwork_url=%s", 
+                          file_path, artwork_url)
+                client_param = client
+                if args.version_2:
+                    logger.debug("Using version 2 of the Tonies JSON format")
+                    success = fetch_and_update_tonies_json_v2(client_param, file_path, [], artwork_url, output_dir)
+                else:
+                    success = fetch_and_update_tonies_json_v1(client_param, file_path, [], artwork_url, output_dir)
+                if success:
+                    logger.info("Successfully updated Tonies JSON for %s", file_path)
+                else:
+                    logger.warning("Failed to update Tonies JSON for %s", file_path)
+                    logger.debug("fetch_and_update_tonies_json returned failure")
+            logger.trace("Exiting after direct upload with code 0")
+            sys.exit(0)
+        elif not args.recursive:
+            if not os.path.exists(args.input_filename):
+                logger.error("File not found: %s", args.input_filename)
+            elif not os.path.isfile(args.input_filename):
+                logger.error("Not a regular file: %s", args.input_filename)
+            logger.debug("File exists: %s, Is file: %s", 
+                      os.path.exists(args.input_filename), 
+                      os.path.isfile(args.input_filename) if os.path.exists(args.input_filename) else False)
+            logger.trace("Exiting with code 1 due to invalid input file")
+            sys.exit(1)
     
+    if args.recursive and args.upload:
+        logger.info("Recursive mode with upload enabled: %s -> %s", args.input_filename, teddycloud_url)
+        logger.debug("Will process all files in directory recursively and upload to TeddyCloud")
+
     # ------------- Librarys / Prereqs -------------
     logger.debug("Checking for external dependencies")
     ffmpeg_binary = args.ffmpeg
