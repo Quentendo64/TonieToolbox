@@ -95,3 +95,80 @@ SUPPORTED_EXTENSIONS = [
         '.ape', '.wma', '.aiff', '.mp2', '.mp4', '.webm', '.mka'
     ]
 
+ARTWORK_NAMES = [
+        'cover', 'folder', 'album', 'front', 'artwork', 'image', 
+        'albumart', 'albumartwork', 'booklet'
+    ]
+ARTWORK_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
+
+
+TAG_VALUE_REPLACEMENTS = {
+    "Die drei ???": "Die drei Fragezeichen",
+    "Die Drei ???": "Die drei Fragezeichen",
+    "DIE DREI ???": "Die drei Fragezeichen",
+    "Die drei !!!": "Die drei Ausrufezeichen",
+    "Die Drei !!!": "Die drei Ausrufezeichen",
+    "DIE DREI !!!": "Die drei Ausrufezeichen",
+    "TKKG™": "TKKG",
+    "Die drei ??? Kids": "Die drei Fragezeichen Kids",
+    "Die Drei ??? Kids": "Die drei Fragezeichen Kids",
+    "Bibi & Tina": "Bibi und Tina",
+    "Benjamin Blümchen™": "Benjamin Blümchen",
+    "???": "Fragezeichen",
+    "!!!": "Ausrufezeichen",
+}
+
+TAG_MAPPINGS = {
+    # ID3 (MP3) tags
+    'TIT2': 'title',
+    'TALB': 'album',
+    'TPE1': 'artist',
+    'TPE2': 'albumartist',
+    'TCOM': 'composer',
+    'TRCK': 'tracknumber',
+    'TPOS': 'discnumber',
+    'TDRC': 'date',
+    'TCON': 'genre',
+    'TPUB': 'publisher',
+    'TCOP': 'copyright',
+    'COMM': 'comment',
+    
+    # Vorbis tags (FLAC, OGG)
+    'title': 'title',
+    'album': 'album',
+    'artist': 'artist',
+    'albumartist': 'albumartist',
+    'composer': 'composer',
+    'tracknumber': 'tracknumber',
+    'discnumber': 'discnumber',
+    'date': 'date',
+    'genre': 'genre',
+    'publisher': 'publisher',
+    'copyright': 'copyright',
+    'comment': 'comment',
+    
+    # MP4 (M4A, AAC) tags
+    '©nam': 'title',
+    '©alb': 'album',
+    '©ART': 'artist',
+    'aART': 'albumartist',
+    '©wrt': 'composer',
+    'trkn': 'tracknumber',
+    'disk': 'discnumber',
+    '©day': 'date',
+    '©gen': 'genre',
+    '©pub': 'publisher',
+    'cprt': 'copyright',
+    '©cmt': 'comment',
+    
+    # Additional tags some files might have
+    'album_artist': 'albumartist',
+    'track': 'tracknumber',
+    'track_number': 'tracknumber',
+    'disc': 'discnumber',
+    'disc_number': 'discnumber',
+    'year': 'date',
+    'albuminterpret': 'albumartist',  # German tag name
+    'interpret': 'artist',            # German tag name
+
+}

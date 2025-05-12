@@ -1,9 +1,10 @@
 import os
 import sys
-from pathlib import Path
-import configparser
+import json
 from .constants import SUPPORTED_EXTENSIONS, ICON
+from .logger import get_logger
 
+logger = get_logger('integration_explorer')
 
 class WindowsClassicContextMenuIntegration:
     """
@@ -19,11 +20,12 @@ class WindowsClassicContextMenuIntegration:
         self.entry_is_separator = '"CommandFlags"=dword:00000008'
         self.show_uac = '"CommandFlags"=dword:00000010'
         self.separator_below = '"CommandFlags"=dword:00000040'
-        self.separator_above = '"CommandFlags"=dword:00000020'    
+        self.separator_above = '"CommandFlags"=dword:00000020'
         self.error_handling = r' && if %ERRORLEVEL% neq 0 (echo Error: Command failed with error code %ERRORLEVEL% && pause && exit /b %ERRORLEVEL%) else (echo Command completed successfully && ping -n 2 127.0.0.1 > nul)'
         self.show_info_error_handling = r' && if %ERRORLEVEL% neq 0 (echo Error: Command failed with error code %ERRORLEVEL% && pause && exit /b %ERRORLEVEL%) else (echo. && echo Press any key to close this window... && pause > nul)'
-
+        self._setup_upload()
         self._setup_commands()
+
     
     def _setup_commands(self):
         """Set up all command strings for registry entries"""
@@ -46,21 +48,50 @@ class WindowsClassicContextMenuIntegration:
         self.upload_folder_cmd = f'cmd.exe /c \\"echo Running TonieToolbox recursive folder convert and upload command... && \\"{self.exe_path_reg}\\" --recursive --output-to-source --upload \\"%1\\"{self.error_handling}\\"'
         self.upload_folder_artwork_cmd = f'cmd.exe /c \\"echo Running TonieToolbox recursive folder convert, upload and artwork command... && \\"{self.exe_path_reg}\\" --recursive --output-to-source --upload --include-artwork \\"%1\\"{self.error_handling}\\"'
         self.upload_folder_artwork_json_cmd = f'cmd.exe /c \\"echo Running TonieToolbox recursive folder convert, upload, artwork and JSON command... && \\"{self.exe_path_reg}\\" --recursive --output-to-source --upload --include-artwork --create-custom-json \\"%1\\"{self.error_handling}\\"'
-    
+
     def _load_config(self):
         """Load configuration settings from config.json"""
         config_path = os.path.join(self.output_dir, 'config.json')
         if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")            
-        config = configparser.ConfigParser()
-        config.read(config_path)
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        
+        with open(config_path, 'r') as f:
+            config = json.loads(f.read())
         
         return config
 
     def _setup_upload(self):
         """Set up upload functionality based on config.json settings"""
-        config = self._load_config()
-
+        try:
+            config = self._load_config()        
+            upload_config = config.get('upload', {})        
+            self.upload_urls = upload_config.get('url', [])
+            self.username = upload_config.get('username', '')
+            self.password = upload_config.get('password', '')
+            if self.username and self.password:
+                self.basic_authentication_cmd = f'--username {self.username} --password {self.password}'
+                self.basic_authentication = True
+            self.client_cert_path = upload_config.get('client_cert_path', '')
+            self.client_cert_key_path = upload_config.get('client_cert_key_path', '')
+            if self.client_cert_path and self.client_cert_key_path:
+                self.client_cert_cmd = f'--client-cert {self.client_cert_path} --client-cert-key {self.client_cert_key_path}'
+                self.client_cert_authentication = True
+            if self.client_cert_authentication and self.basic_authentication:
+                logger.warning("Both client certificate and basic authentication are set. Only one can be used.")
+                return False
+            if not self.client_cert_authentication and not self.basic_authentication:
+                self.none_authentication = True
+            self.upload_url = self.upload_urls[0] if self.upload_urls else ''
+            return True if self.client_cert_authentication or self.basic_authentication or self.none_authentication and self.upload_url else False
+        except FileNotFoundError:
+            logger.debug("Configuration file not found. Skipping upload setup.")
+            return False
+        except json.JSONDecodeError:
+            logger.debug("Error decoding JSON in configuration file. Skipping upload setup.")
+            return False
+        except Exception as e:
+            logger.debug(f"Unexpected error while loading configuration: {e}")
+            return False
 
     def _generate_audio_extensions_entries(self):
         """Generate registry entries for supported audio file extensions"""
