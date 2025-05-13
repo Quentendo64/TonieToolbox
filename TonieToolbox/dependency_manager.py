@@ -35,7 +35,7 @@ DEPENDENCIES = {
             'extract_dir': 'ffmpeg'
         },
         'darwin': {
-            'url': 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
+            'url': 'https://evermeet.cx/ffmpeg/get/zip',
             'bin_path': 'ffmpeg',
             'extract_dir': 'ffmpeg'
         }
@@ -112,6 +112,11 @@ def download_file(url, destination):
         return True
     except Exception as e:
         logger.error("Failed to download %s: %s", url, e)
+        # On macOS, provide more helpful error message for SSL certificate issues
+        if platform.system() == 'Darwin' and 'CERTIFICATE_VERIFY_FAILED' in str(e):
+            logger.error("SSL certificate verification failed on macOS. This is a known issue.")
+            logger.error("You can solve this by running: /Applications/Python 3.x/Install Certificates.command")
+            logger.error("Or by using the --auto-download flag which will bypass certificate verification.")
         return False
 
 def extract_archive(archive_path, extract_dir):

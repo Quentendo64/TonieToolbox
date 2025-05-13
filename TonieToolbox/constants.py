@@ -95,6 +95,24 @@ SUPPORTED_EXTENSIONS = [
         '.ape', '.wma', '.aiff', '.mp2', '.mp4', '.webm', '.mka'
     ]
 
+UTI_MAPPINGS = {
+            'mp3': 'public.mp3',
+            'wav': 'public.wav',
+            'flac': 'org.xiph.flac',
+            'ogg': 'org.xiph.ogg',
+            'opus': 'public.opus',
+            'aac': 'public.aac-audio',
+            'm4a': 'public.m4a-audio',
+            'wma': 'com.microsoft.windows-media-wma',
+            'aiff': 'public.aiff-audio',
+            'mp2': 'public.mp2',
+            'mp4': 'public.mpeg-4-audio',
+            'mka': 'public.audio',
+            'webm': 'public.webm-audio',
+            'ape': 'public.audio',
+            'taf': 'public.audio'
+        }
+
 ARTWORK_NAMES = [
         'cover', 'folder', 'album', 'front', 'artwork', 'image', 
         'albumart', 'albumartwork', 'booklet'
