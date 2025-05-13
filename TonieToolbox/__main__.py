@@ -11,7 +11,7 @@ from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
 from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files
-from .dependency_manager import get_ffmpeg_binary, get_opus_binary
+from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename
 from .version_handler import check_for_updates, clear_version_cache
@@ -135,7 +135,7 @@ def main():
     args = parser.parse_args()
     
     # ------------- Parser - Source Input -------------
-    if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration or args.config_integration):
+    if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration or args.config_integration or args.auto_download):
         parser.error("the following arguments are required: SOURCE")
 
     # ------------- Logging -------------
@@ -174,19 +174,35 @@ def main():
         
         if not is_latest and not update_confirmed and not (args.silent or args.quiet):
             logger.info("Update available but user chose to continue without updating.")
+
+    # ------------- Autodownload & Dependency Checks -------------
+    if args.auto_download:
+        logger.debug("Auto-download requested for ffmpeg and opusenc")
+        if not ensure_dependency('ffmpeg', auto_download=True):
+            logger.error("Failed to download ffmpeg. Please install it manually.")
+            sys.exit(1)
+        if not ensure_dependency('opusenc', auto_download=True):
+            logger.error("Failed to download opusenc. Please install it manually.")
+            sys.exit(1)
+        logger.info("FFmpeg and opusenc downloaded successfully.")
+
     # ------------- Context Menu Integration -------------
     if args.install_integration or args.uninstall_integration:
-        logger.debug("Context menu integration requested: install=%s, uninstall=%s", 
-                  args.install_integration, args.uninstall_integration)
-        success = handle_integration(args)
-        if success:
-            if args.install_integration:
-                logger.info("Context menu integration installed successfully")
+        if ensure_dependency('ffmpeg') and ensure_dependency('opusenc'):
+            logger.debug("Context menu integration requested: install=%s, uninstall=%s",
+                      args.install_integration, args.uninstall_integration)
+            success = handle_integration(args)
+            if success:
+                if args.install_integration:
+                    logger.info("Context menu integration installed successfully")
+                else:
+                    logger.info("Context menu integration uninstalled successfully")
             else:
-                logger.info("Context menu integration uninstalled successfully")
+                logger.error("Failed to handle context menu integration")
+            sys.exit(0)
         else:
-            logger.error("Failed to handle context menu integration")
-        sys.exit(0)
+            logger.error("FFmpeg and opusenc are required for context menu integration")
+            sys.exit(1)    
     if args.config_integration:
         logger.debug("Opening configuration file for editing")
         handle_config()
