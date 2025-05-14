@@ -2,7 +2,8 @@
 import os
 import sys
 import json
-from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE
+from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE, ICON_BASE64
+from .artwork import base64_to_ico
 from .logger import get_logger
 
 logger = get_logger('integration_windows')
@@ -127,8 +128,11 @@ class WindowsClassicContextMenuIntegration:
         self.upload_folder_artwork_json_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, use_json=True, log_to_file=self.log_to_file)
 
     def _apply_config_template(self):
-        """Apply the default configuration template if config.json is missing or invalid."""
+        """Apply the default configuration template if config.json is missing or invalid. Extracts the icon from base64 if not present."""
         config_path = os.path.join(self.output_dir, 'config.json')
+        icon_path = os.path.join(self.output_dir, 'icon.ico')
+        if not os.path.exists(icon_path):
+            base64_to_ico(ICON_BASE64, icon_path)
         if not os.path.exists(config_path):
             with open(config_path, 'w') as f:
                 json.dump(CONFIG_TEMPLATE, f, indent=4)
