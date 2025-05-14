@@ -178,13 +178,15 @@ def main():
     # ------------- Autodownload & Dependency Checks -------------
     if args.auto_download:
         logger.debug("Auto-download requested for ffmpeg and opusenc")
-        if not ensure_dependency('ffmpeg', auto_download=True):
-            logger.error("Failed to download ffmpeg. Please install it manually.")
+        ffmpeg_binary = get_ffmpeg_binary(auto_download=True)
+        opus_binary = get_opus_binary(auto_download=True)
+        if ffmpeg_binary and opus_binary:
+            logger.info("FFmpeg and opusenc downloaded successfully.")
+            if args.input_filename is None:
+                sys.exit(0)
+        else:
+            logger.error("Failed to download ffmpeg or opusenc. Please install them manually.")
             sys.exit(1)
-        if not ensure_dependency('opusenc', auto_download=True):
-            logger.error("Failed to download opusenc. Please install it manually.")
-            sys.exit(1)
-        logger.info("FFmpeg and opusenc downloaded successfully.")
 
     # ------------- Context Menu Integration -------------
     if args.install_integration or args.uninstall_integration:
