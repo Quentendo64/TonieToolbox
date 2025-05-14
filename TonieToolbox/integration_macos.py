@@ -1,3 +1,8 @@
+#!/usr/bin/python3
+"""
+Integration for MacOS Quick Actions (Services) for TonieToolbox.
+This module provides functionality to create and manage Quick Actions.
+"""
 import os
 import sys
 import json
@@ -8,7 +13,7 @@ from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE,UTI_MAPPINGS,ICON_B
 from .artwork import base64_to_ico
 from .logger import get_logger
 
-logger = get_logger('integration_macos')
+logger = get_logger(__name__)
 
 class MacOSContextMenuIntegration:
     """

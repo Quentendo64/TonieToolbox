@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 TonieToolbox module for handling the tonies.custom.json operations.
 
@@ -19,7 +20,7 @@ from .media_tags import get_file_tags, extract_album_info
 from .constants import LANGUAGE_MAPPING, GENRE_MAPPING
 from .teddycloud import TeddyCloudClient
 
-logger = get_logger('tonies_json')
+logger = get_logger(__name__)
 
 class ToniesJsonHandlerv1:
     """Handler for tonies.custom.json operations using v1 format."""

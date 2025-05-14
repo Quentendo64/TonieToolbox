@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Version handler to check if the latest version of TonieToolbox is being used.
 """
@@ -17,6 +18,7 @@ CACHE_DIR = os.path.join(os.path.expanduser("~"), ".tonietoolbox")
 CACHE_FILE = os.path.join(CACHE_DIR, "version_cache.json")
 CACHE_EXPIRY = 86400  # 24 hours in seconds
 
+logger = get_logger(__name__)
 
 def get_pypi_version(force_refresh: bool = False) -> tuple[str, str | None]:
     """
@@ -27,7 +29,6 @@ def get_pypi_version(force_refresh: bool = False) -> tuple[str, str | None]:
     Returns:
         tuple[str, str | None]: (latest_version, None) on success, (current_version, error_message) on failure
     """
-    logger = get_logger("version_handler")
     logger.debug("Checking for latest version (force_refresh=%s)", force_refresh)
     logger.debug("Current version: %s", __version__)
     
@@ -97,7 +98,6 @@ def compare_versions(v1: str, v2: str) -> int:
     Returns:
         int: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
     """
-    logger = get_logger("version_handler")
     logger.debug("Comparing versions: '%s' vs '%s'", v1, v2)
     
     try:   
@@ -145,7 +145,6 @@ def check_for_updates(quiet: bool = False, force_refresh: bool = False) -> tuple
             message: string message about the update status or error
             update_confirmed: boolean indicating if the user confirmed the update
     """
-    logger = get_logger("version_handler")
     current_version = __version__
     update_confirmed = False
     
@@ -204,7 +203,6 @@ def install_update() -> bool:
     Returns:
         bool: True if the update was successfully installed, False otherwise
     """
-    logger = get_logger("version_handler")
     import subprocess
     import sys
     
@@ -242,7 +240,6 @@ def clear_version_cache() -> bool:
     Returns:
         bool: True if cache was cleared, False otherwise
     """
-    logger = get_logger("version_handler")
     
     try:
         if os.path.exists(CACHE_FILE):

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Logging configuration for the TonieToolbox package.
 """

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Classes and functions for handling Opus audio packets
 """
@@ -6,8 +7,7 @@ import struct
 from .constants import SAMPLE_RATE_KHZ
 from .logger import get_logger
 
-# Setup logging
-logger = get_logger('opus_packet')
+logger = get_logger(__name__)
 
 
 class OpusPacket:

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Module for generating intelligent output filenames for TonieToolbox.
 """
@@ -8,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 from .logger import get_logger
 
-logger = get_logger('filename_generator')
+logger = get_logger(__name__)
 
 def sanitize_filename(filename: str) -> str:
     """

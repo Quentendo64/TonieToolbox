@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Classes and functions for handling OGG container pages
 """
@@ -14,8 +15,7 @@ from .constants import (
 )
 from .logger import get_logger
 
-# Setup logging
-logger = get_logger('ogg_page')
+logger = get_logger(__name__)
 
 
 def create_crc_table() -> list[int]:

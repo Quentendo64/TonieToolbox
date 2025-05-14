@@ -8,7 +8,7 @@ from .teddycloud import TeddyCloudClient
 import json
 from typing import Optional, Union
 
-logger = get_logger('tags')
+logger = get_logger(__name__)
 
 def get_tags(client: 'TeddyCloudClient') -> bool:
     """

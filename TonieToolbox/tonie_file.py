@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Tonie file operations module
 """
@@ -15,7 +16,7 @@ from .ogg_page import OggPage
 from .constants import OPUS_TAGS, SAMPLE_RATE_KHZ, TIMESTAMP_DEDUCT
 from .logger import get_logger
 
-logger = get_logger('tonie_file')
+logger = get_logger(__name__)
 
 
 def toniefile_comment_add(buffer: bytearray, length: int, comment_str: str) -> int:

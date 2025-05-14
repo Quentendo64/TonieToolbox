@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Dependency management for the TonieToolbox package.
 
@@ -22,7 +23,7 @@ import concurrent.futures
 from tqdm.auto import tqdm
 
 from .logger import get_logger
-logger = get_logger('dependency_manager')
+logger = get_logger(__name__)
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".tonietoolbox")
 LIBS_DIR = os.path.join(CACHE_DIR, "libs")

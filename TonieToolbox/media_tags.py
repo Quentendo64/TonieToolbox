@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Media tag processing functionality for the TonieToolbox package
 
@@ -14,6 +15,7 @@ from mutagen.flac import Picture
 from .logger import get_logger
 from .dependency_manager import is_mutagen_available, ensure_mutagen
 from .constants import ARTWORK_NAMES, ARTWORK_EXTENSIONS, TAG_VALUE_REPLACEMENTS, TAG_MAPPINGS
+logger = get_logger(__name__)
 
 MUTAGEN_AVAILABLE = False
 mutagen = None
@@ -55,9 +57,6 @@ def _import_mutagen():
 
 if is_mutagen_available():
     _import_mutagen()
-
-logger = get_logger('media_tags')
-
 
 def normalize_tag_value(value: str) -> str:
     """

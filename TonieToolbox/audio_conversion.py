@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Audio conversion functionality for the TonieToolbox package
 """
@@ -10,7 +11,7 @@ from .dependency_manager import get_ffmpeg_binary, get_opus_binary
 from .constants import SUPPORTED_EXTENSIONS
 from .logger import get_logger
 
-logger = get_logger('audio_conversion')
+logger = get_logger(__name__)
 
 
 def get_opus_tempfile(

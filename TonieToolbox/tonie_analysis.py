@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Functions for analyzing Tonie files
 """
@@ -10,7 +11,7 @@ from  . import tonie_header_pb2
 from .ogg_page import OggPage
 from .logger import get_logger
 
-logger = get_logger('tonie_analysis')
+logger = get_logger(__name__)
 
 def format_time(ts: float) -> str:
     """

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Constants used throughout the TonieToolbox package
 """

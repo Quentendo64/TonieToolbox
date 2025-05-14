@@ -10,7 +10,7 @@ import ssl
 import socket
 import requests
 from .logger import get_logger
-logger = get_logger('teddycloud')
+logger = get_logger(__name__)
 DEFAULT_CONNECTION_TIMEOUT = 10
 DEFAULT_READ_TIMEOUT = 15  # seconds
 DEFAULT_MAX_RETRIES = 3

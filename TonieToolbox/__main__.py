@@ -150,7 +150,7 @@ def main():
     else:
         log_level = logging.INFO 
     setup_logging(log_level, log_to_file=args.log_file)
-    logger = get_logger('main')
+    logger = get_logger(__name__)
     logger.debug("Starting TonieToolbox v%s with log level: %s", __version__, logging.getLevelName(log_level))
     logger.debug("Command-line arguments: %s", vars(args))
 

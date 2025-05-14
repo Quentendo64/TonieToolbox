@@ -1,10 +1,12 @@
+#!/usr/bin/python3
 import platform
+import os
+import subprocess
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 def handle_integration(args):
-    import platform
     if platform.system() == 'Windows':
         from .integration_windows import WindowsClassicContextMenuIntegration as ContextMenuIntegration
         if args.install_integration:
@@ -48,11 +50,6 @@ def handle_integration(args):
     
 def handle_config():
     """Opens the configuration file in the default text editor."""
-    import os
-    import platform
-    import subprocess
-
-   
     config_path = os.path.join(os.path.expanduser("~"), ".tonietoolbox", "config.json")
     if not os.path.exists(config_path):
         logger.info(f"Configuration file not found at {config_path}.")

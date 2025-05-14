@@ -1,4 +1,8 @@
-# filepath: d:\Repository\TonieToolbox\TonieToolbox\integration_windows.py
+#!/usr/bin/python3
+"""
+Integration for Windows "classic" context menu.
+This module generates Windows registry entries to add a 'TonieToolbox' cascade menu.
+"""
 import os
 import sys
 import json
@@ -6,7 +10,7 @@ from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE, ICON_BASE64
 from .artwork import base64_to_ico
 from .logger import get_logger
 
-logger = get_logger('integration_windows')
+logger = get_logger(__name__)
 
 class WindowsClassicContextMenuIntegration:
     """

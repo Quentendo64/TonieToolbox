@@ -13,6 +13,7 @@ from .logger import get_logger
 from .teddycloud import TeddyCloudClient
 from .media_tags import extract_artwork, find_cover_image
 
+logger = get_logger(__name__)
 
 def upload_artwork(
     client: TeddyCloudClient,
@@ -30,8 +31,7 @@ def upload_artwork(
         audio_files (list[str]): List of audio files to extract artwork from if needed
     Returns:
         tuple[bool, Optional[str]]: (success, artwork_url) where success is a boolean and artwork_url is the URL of the uploaded artwork
-    """
-    logger = get_logger('artwork')
+    """    
     logger.info("Looking for artwork for Tonie file: %s", taf_filename)
     taf_basename = os.path.basename(taf_filename)
     taf_name = os.path.splitext(taf_basename)[0]

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Recursive folder processing functionality for the TonieToolbox package
 """
@@ -11,7 +12,7 @@ import re
 from .audio_conversion import filter_directories
 from .logger import get_logger
 
-logger = get_logger('recursive_processor')
+logger = get_logger(__name__)
 
 
 def find_audio_folders(root_path: str) -> list[dict[str, any]]:
