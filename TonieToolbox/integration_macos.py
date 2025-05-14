@@ -4,7 +4,8 @@ import json
 import plistlib
 import subprocess
 from pathlib import Path
-from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE,UTI_MAPPINGS
+from .constants import SUPPORTED_EXTENSIONS, CONFIG_TEMPLATE,UTI_MAPPINGS,ICON_BASE64
+from .artwork import base64_to_ico
 from .logger import get_logger
 
 logger = get_logger('integration_macos')
@@ -112,7 +113,7 @@ class MacOSContextMenuIntegration:
             cmd += '  read -p "Press any key to close this window..." key\n'
             cmd += '  exit 1\n'
             cmd += 'fi\n\n'        
-            else:
+        else:
             # For regular file operations, handle paths correctly
             cmd += '# Handle file paths correctly - try multiple methods for macOS\n'
             cmd += 'FILE_PATH=""\n'
@@ -178,7 +179,8 @@ class MacOSContextMenuIntegration:
         # Build the actual command
         cmd_line = f'"{exe}" {base_args}'
         if log_to_file:
-            cmd_line += ' --log-file'        if is_recursive:
+            cmd_line += ' --log-file'        
+        if is_recursive:
             cmd_line += ' --recursive'
         if output_to_source:
             cmd_line += ' --output-to-source'
@@ -271,8 +273,11 @@ class MacOSContextMenuIntegration:
         self.upload_folder_artwork_json_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, use_upload=True, use_artwork=True, use_json=True, log_to_file=self.log_to_file)
 
     def _apply_config_template(self):
-        """Apply the default configuration template if config.json is missing or invalid."""
+        """Apply the default configuration template if config.json is missing or invalid. Extracts the icon from base64 if not present."""
         config_path = os.path.join(self.output_dir, 'config.json')
+        icon_path = os.path.join(self.output_dir, 'icon.ico')
+        if not os.path.exists(icon_path):
+            base64_to_ico(ICON_BASE64, icon_path)
         if not os.path.exists(config_path):
             with open(config_path, 'w') as f:
                 json.dump(CONFIG_TEMPLATE, f, indent=4)
