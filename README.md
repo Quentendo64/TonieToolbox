@@ -773,3 +773,6 @@ If you need help, have questions, or want to report a bug, please use the follow
 - [GitHub Issues](https://github.com/Quentendo64/TonieToolbox/issues) for bug reports and feature requests
 - [GitHub Discussions](https://github.com/Quentendo64/TonieToolbox/discussions) for general questions and community support
 - [HOWTO Guide](HOWTO.md) for common usage instructions
+
+## Attribution
+[Parrot Icon created by Freepik - Flaticon](https://www.flaticon.com/free-animated-icons/parrot)

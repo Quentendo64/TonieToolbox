@@ -672,7 +672,7 @@ def ensure_dependency(dependency_name, auto_download=False):
     bin_name = dependency_name if dependency_name != 'opusenc' else 'opusenc'
     
     # Create a specific folder for this dependency
-    dependency_dir = os.path.join(user_data_dir, dependency_name)
+    dependency_dir = os.path.join(user_data_dir, 'libs', dependency_name)
     
     # First priority: Check if we already downloaded and extracted it previously
     # When auto_download is True, we'll skip this check and download fresh versions
