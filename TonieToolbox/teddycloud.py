@@ -9,6 +9,7 @@ import base64
 import ssl
 import socket
 import requests
+import json
 from .logger import get_logger
 logger = get_logger(__name__)
 DEFAULT_CONNECTION_TIMEOUT = 10
@@ -334,3 +335,115 @@ class TeddyCloudClient:
             }
     
     # ------------- Custom API Methods -------------
+
+    def _get_paths_cache_file(self) -> str:
+        """
+        Get the path to the paths cache file.
+        
+        Returns:
+            str: Path to the paths cache file
+        """
+        cache_dir = os.path.join(os.path.expanduser("~"), ".tonietoolbox")
+        os.makedirs(cache_dir, exist_ok=True)
+        return os.path.join(cache_dir, "paths.json")
+    
+    def _load_paths_cache(self) -> set:
+        """
+        Load the paths cache from the cache file.
+        
+        Returns:
+            set: Set of existing directory paths
+        """
+        cache_file = self._get_paths_cache_file()
+        try:
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    paths_data = json.load(f)
+                    # Convert to set for faster lookups
+                    return set(paths_data.get('paths', []))
+            return set()
+        except Exception as e:
+            logger.warning(f"Failed to load paths cache: {e}")
+            return set()
+    
+    def _save_paths_cache(self, paths: set) -> None:
+        """
+        Save the paths cache to the cache file.
+        
+        Args:
+            paths (set): Set of directory paths to save
+        """
+        cache_file = self._get_paths_cache_file()
+        try:
+            paths_data = {'paths': list(paths)}
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(paths_data, f, indent=2)
+            logger.debug(f"Saved {len(paths)} paths to cache file")
+        except Exception as e:
+            logger.warning(f"Failed to save paths cache: {e}")
+    
+    def create_directories_recursive(self, path: str, overlay: str = None, special: str = None) -> str:
+        """
+        Create directories recursively on the TeddyCloud server.
+
+        This function handles both cases:
+        - Directories that already exist (prevents 500 errors)
+        - Parent directories that don't exist yet (creates them first)
+        
+        This optimized version uses a local paths cache instead of querying the file index,
+        since the file index might not represent the correct folders.
+
+        Args:
+            path (str): Directory path to create (can contain multiple levels)
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
+
+        Returns:
+            str: Response message from server
+        """
+        path = path.replace('\\', '/').strip('/')
+        if not path:
+            return "Path is empty"
+        existing_dirs = self._load_paths_cache()
+        logger.debug(f"Loaded {len(existing_dirs)} existing paths from cache")
+        path_components = path.split('/')
+        current_path = ""
+        result = "OK"
+        paths_updated = False
+        for component in path_components:
+            if current_path:
+                current_path += f"/{component}"
+            else:
+                current_path = component
+            if current_path in existing_dirs:
+                logger.debug(f"Directory '{current_path}' exists in paths cache, skipping creation")
+                continue
+
+            try:
+                result = self.create_directory(current_path, overlay, special)
+                logger.debug(f"Created directory: {current_path}")
+                # Add the newly created directory to our cache
+                existing_dirs.add(current_path)
+                paths_updated = True
+            except requests.exceptions.HTTPError as e:
+                # If it's a 500 error, likely the directory already exists
+                if e.response.status_code == 500:
+                    if "already exists" in e.response.text.lower():
+                        logger.debug(f"Directory '{current_path}' already exists, continuing")
+                        # Add to our cache for future operations
+                        existing_dirs.add(current_path)
+                        paths_updated = True
+                    else:
+                        # Log the actual error message but continue anyway
+                        # This allows us to continue even if the error is something else
+                        logger.warning(f"Warning while creating '{current_path}': {str(e)}")
+                else:
+                    # Re-raise for other HTTP errors
+                    logger.error(f"Failed to create directory '{current_path}': {str(e)}")
+                    raise
+        
+        # Save updated paths cache if any changes were made
+        if paths_updated:
+            self._save_paths_cache(existing_dirs)
+                
+        return result
