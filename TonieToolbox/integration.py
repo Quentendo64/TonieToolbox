@@ -52,15 +52,19 @@ def handle_config():
     import platform
     import subprocess
 
+   
     config_path = os.path.join(os.path.expanduser("~"), ".tonietoolbox", "config.json")
-
     if not os.path.exists(config_path):
         logger.info(f"Configuration file not found at {config_path}.")
         logger.info("Creating a new configuration file. Using --install-integration will create a new config file.")
         return
     if platform.system() == "Windows":
+        from .integration_windows import WindowsClassicContextMenuIntegration as ContextMenuIntegration
+        ContextMenuIntegration._apply_config_template()
         os.startfile(config_path)
     elif platform.system() == "Darwin":
+        from .integration_macos import MacOSContextMenuIntegration as ContextMenuIntegration
+        ContextMenuIntegration._apply_config_template()
         subprocess.call(["open", config_path])
     elif platform.system() == "Linux":
         subprocess.call(["xdg-open", config_path])
