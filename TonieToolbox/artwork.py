@@ -4,6 +4,7 @@ Artwork handling functionality for TonieToolbox.
 """
 
 import os
+import base64
 import tempfile
 import shutil
 from typing import List, Optional, Tuple
@@ -108,3 +109,46 @@ def upload_artwork(
                 logger.debug("Failed to remove temporary artwork file: %s", e)
     
     return upload_success, artwork_url
+
+def ico_to_base64(ico_path):
+    """
+    Convert an ICO file to a base64 string
+    
+    Args:
+        ico_path: Path to the ICO file
+        
+    Returns:
+        Base64 encoded string of the ICO file
+    """
+    if not os.path.exists(ico_path):
+        raise FileNotFoundError(f"ICO file not found: {ico_path}")
+    
+    with open(ico_path, "rb") as ico_file:
+        ico_bytes = ico_file.read()
+        
+    base64_string = base64.b64encode(ico_bytes).decode('utf-8')
+    return base64_string
+
+
+def base64_to_ico(base64_string, output_path):
+    """
+    Convert a base64 string back to an ICO file
+    
+    Args:
+        base64_string: Base64 encoded string of the ICO file
+        output_path: Path where to save the ICO file
+        
+    Returns:
+        Path to the saved ICO file
+    """
+    ico_bytes = base64.b64decode(base64_string)
+    
+    # Create directory if it doesn't exist
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    with open(output_path, "wb") as ico_file:
+        ico_file.write(ico_bytes)
+        
+    return output_path
