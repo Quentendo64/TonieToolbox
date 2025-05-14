@@ -19,7 +19,7 @@ setup(
     version=version,
     author="Quentendo64",
     author_email="quentin@wohlfeil.at",
-    description="Convert audio files to Toniebox compatible format (.TAF)",
+    description="Convert audio files to Toniebox compatible format (.TAF) and interact with TeddyCloud.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Quentendo64/TonieToolbox",
@@ -38,7 +38,10 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "protobuf<=3.19.0",
-        "mutagen>=1.47.0"
+        "requests>=2.32.3",
+        "mutagen>=1.47.0",
+        "packaging>=25.0",
+        "tqdm>=4.67.1"
     ],
     entry_points={
         'console_scripts': [
