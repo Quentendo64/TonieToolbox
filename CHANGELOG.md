@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0rc1] - 2025-05-15
+
+### Added
+
+### Fixed
+- Possible Integration of *WIP Integration for MacOS
+### Changed
+
+- README Structure, moved Technical Details to [TECHNICAL.md](TECHNICAL.md) 
+
+### Removed
+
+- Not ready: MacOS Integration
+- Not ready: Compare from Windows Integration for .taf
+
+## [0.6.0a5] - 2025-05-15
+
+### Added
+
+- Dynamic Pathing based on meta tags
+
+### Fixed
+
+- Fixes for context menu integration
+
+## [0.6.0a4] - 2025-05-14
+
+### Fixed
+
+- Fixes for context menu integration
+
+## [0.6.0a3] - 2025-05-13
+
+### Fixed
+
+- Fixes for context menu integration
+
 ## [0.6.0a2] - 2025-05-12
 
 ### Added

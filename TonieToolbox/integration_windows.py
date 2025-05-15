@@ -123,7 +123,7 @@ class WindowsClassicContextMenuIntegration:
         self.upload_taf_cmd = self._build_cmd(log_level_arg, use_upload=True, log_to_file=self.log_to_file)
         self.upload_taf_artwork_cmd = self._build_cmd(log_level_arg, use_upload=True, use_artwork=True, log_to_file=self.log_to_file)
         self.upload_taf_artwork_json_cmd = self._build_cmd(log_level_arg, use_upload=True, use_artwork=True, use_json=True, log_to_file=self.log_to_file)
-        self.compare_taf_cmd = self._build_cmd(log_level_arg, use_compare=True, keep_open=True, log_to_file=self.log_to_file)
+        #self.compare_taf_cmd = self._build_cmd(log_level_arg, use_compare=True, keep_open=True, log_to_file=self.log_to_file)
 
         # Folder commands
         self.convert_folder_cmd = self._build_cmd(f'{log_level_arg}', is_recursive=True, is_folder=True, log_to_file=self.log_to_file)

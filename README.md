@@ -15,6 +15,14 @@ A Toolkit for converting various audio formats into the Tonie-compatible TAF for
 → [HOWTO Guide for Beginners](HOWTO.md)  
 → [Contributing Guidelines](CONTRIBUTING.md)
 
+## 🎯 New Features (v0.6.0)
+
+The latest release of TonieToolbox includes exciting new capabilities:
+
+- **Enhanced Media Tag Support**: Better handling of complex audio libraries with advanced metadata extraction and usage of tags in your upload path (--path) or as output directory with the new argument --output-to-template eg. "C:\Music\\{albumartist}\\{album}"
+- **Windows Context Menu Integration**: Right-click to convert audio files directly from File Explorer. Use --config-integration to configure the upload functions. If not needed just use --install-integration
+
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -229,12 +237,17 @@ Output:
 ```shell
 usage: TonieToolbox.py [-h] [-v] [--upload URL] [--include-artwork] [--get-tags URL] 
                     [--ignore-ssl-verify] [--special-folder FOLDER] [--path PATH]
-                    [--show-progress] [--connection-timeout SECONDS]
-                    [--read-timeout SECONDS] [--max-retries RETRIES]
-                    [--retry-delay SECONDS] [--create-custom-json] [-t TIMESTAMP] [-f FFMPEG] 
+                    [--connection-timeout SECONDS] [--read-timeout SECONDS] 
+                    [--max-retries RETRIES] [--retry-delay SECONDS]
+                    [--create-custom-json] [--version-2] [--username USERNAME]
+                    [--password PASSWORD] [--client-cert CERT_FILE] 
+                    [--client-key KEY_FILE] [-t TIMESTAMP] [-f FFMPEG] 
                     [-o OPUSENC] [-b BITRATE] [-c] [-a TAG] [-n] [-i] [-s] [-r] [-O]
-                    [-A] [-k] [-u] [-C FILE2] [-D] [-m] [--name-template TEMPLATE]
-                    [--show-tags] [-S] [-F] [-X] [-d] [-T] [-q] [-Q]
+                    [-fc] [--no-mono-conversion] [-A] [-k] [-u] [-C FILE2] [-D]
+                    [--config-integration] [--install-integration] 
+                    [--uninstall-integration] [-m] [--name-template TEMPLATE]
+                    [--output-to-template PATH_TEMPLATE] [--show-tags]
+                    [-S] [-F] [-X] [-d] [-T] [-q] [-Q] [--log-file]
                     SOURCE [TARGET]
 
 Create Tonie compatible file from Ogg opus file(s).
@@ -250,8 +263,7 @@ TeddyCloud Options:
   --ignore-ssl-verify   Ignore SSL certificate verification (for self-signed certificates)
   --special-folder FOLDER
                         Special folder to upload to (currently only "library" is supported)
-  --path PATH           Path where to write the file on TeddyCloud server
-  --show-progress       Show progress bar during file upload (default: enabled)
+  --path PATH           Path where to write the file on TeddyCloud server (supports templates like "/{albumartist}/{album}")
   --connection-timeout SECONDS
                         Connection timeout in seconds (default: 10)
   --read-timeout SECONDS
@@ -261,12 +273,19 @@ TeddyCloud Options:
   --retry-delay SECONDS
                         Delay between retry attempts in seconds (default: 5)
   --create-custom-json  Fetch and update custom Tonies JSON data
+  --version-2           Use version 2 of the Tonies JSON format (default: version 1)
+  --username USERNAME   Username for basic authentication
+  --password PASSWORD   Password for basic authentication
+  --client-cert CERT_FILE
+                        Path to client certificate file for certificate-based authentication
+  --client-key KEY_FILE
+                        Path to client private key file for certificate-based authentication
 
 optional arguments:
   -h, --help            show this help message and exit
   -v, --version         show program version and exit
   -t, --timestamp TIMESTAMP
-                        set custom timestamp / bitstream serial / reference .taf file
+                        set custom timestamp / bitstream serial
   -f, --ffmpeg FFMPEG   specify location of ffmpeg
   -o, --opusenc OPUSENC specify location of opusenc
   -b, --bitrate BITRATE set encoding bitrate in kbps (default: 96)
@@ -279,17 +298,27 @@ optional arguments:
   -r, --recursive       Process folders recursively
   -O, --output-to-source
                         Save output files in the source directory instead of output directory
+  -fc, --force-creation
+                        Force creation of Tonie file even if it already exists
+  --no-mono-conversion  Do not convert mono audio to stereo (default: convert mono to stereo)
   -A, --auto-download   Automatically download FFmpeg and opusenc if needed
   -k, --keep-temp       Keep temporary opus files in a temp folder for testing
-  -u, --use-legacy-tags Use legacy hardcoded tags instead of dynamic TonieToolbox tags (DEPRECATED)
+  -u, --use-legacy-tags Use legacy hardcoded tags instead of dynamic TonieToolbox tags
   -C, --compare FILE2   Compare input file with another .taf file for debugging
   -D, --detailed-compare
                         Show detailed OGG page differences when comparing files
-  --no-mono-conversion  Do not convert mono audio to stereo (default: convert mono to stereo)
+  --config-integration  Configure context menu integration
+  --install-integration
+                        Integrate with the system (e.g., create context menu entries)
+  --uninstall-integration
+                        Uninstall context menu integration
+
 Media Tag Options:
   -m, --use-media-tags  Use media tags from audio files for naming
   --name-template TEMPLATE
                         Template for naming files using media tags. Example: "{album} - {artist}"
+  --output-to-template PATH_TEMPLATE
+                        Template for output path using media tags. Example: "C:\Music\{albumartist}\{album}"
   --show-tags           Show available media tags from input files
 
 Version Check Options:
@@ -510,6 +539,87 @@ tonietoolbox --split my_tonie.taf --debug
 tonietoolbox --recursive "Music/Collection/" --quiet
 ```
 
+#### Force creation of TAF files
+
+If a valid TAF file already exists, TonieToolbox will skip recreating it by default. To force creation even if the file exists:
+
+```shell
+# Force creation of a TAF file even if it already exists
+tonietoolbox input.mp3 --force-creation
+```
+
+This is useful when you want to update the content or encoding settings of an existing TAF file.
+
+#### Windows Context Menu Integration
+
+TonieToolbox can integrate with Windows Explorer, allowing you to right-click on audio files or folders to convert them:
+
+```shell
+# Install context menu integration (one-time setup)
+tonietoolbox --install-integration
+
+# Configure context menu options
+tonietoolbox --config-integration
+
+# Remove context menu integration
+tonietoolbox --uninstall-integration
+```
+
+After installation, you can right-click on any audio file or folder in Windows Explorer and select "Convert to Tonie Format". 
+
+When changing the configuration via `--config-integration`. Apply them to the integration by simply execute `tonietoolbox --install-integration` again.
+
+#### Log File Generation
+
+Save detailed logs to a timestamped file for troubleshooting complex operations:
+
+```shell
+# Enable log file generation
+tonietoolbox input.mp3 --log-file
+
+# Combine with debug logging for maximum detail
+tonietoolbox --recursive input_directory/ --log-file --debug
+```
+
+Log files are saved in the `.tonietoolbox\logs` folder in your user directory.
+
+#### Enhanced Media Tag Templates
+
+Create custom directory structures based on media tags:
+
+```shell
+# Create output based on a path template
+tonietoolbox input.mp3 --use-media-tags --output-to-template "C:\Music\{albumartist}\{album}"
+
+# Use with recursive processing
+tonietoolbox --recursive "Music/Collection/" --use-media-tags --output-to-template "Organized/{genre}/{year} - {album}"
+```
+
+This creates a directory structure based on the audio files' metadata and places the converted TAF files accordingly.
+
+#### TeddyCloud Authentication Options
+
+> **Note:** Authentication is based on the Features available when using [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter).
+
+TonieToolbox supports multiple authentication methods for secure TeddyCloud connections:
+
+```shell
+# Basic authentication with username and password
+tonietoolbox input.mp3 --upload https://teddycloud.example.com --username admin --password secret
+
+# Certificate-based authentication
+tonietoolbox input.mp3 --upload https://teddycloud.example.com --client-cert certificate.crt --client-key private.key
+```
+
+#### Custom JSON Format Versioning
+
+Choose between different versions of the Tonies JSON format:
+
+```shell
+# Use version 2 of the Tonies JSON format (enhanced metadata)
+tonietoolbox input.mp3 --upload https://teddycloud.example.com --create-custom-json --version-2
+```
+
 ### Media Tags
 
 TonieToolbox can read metadata tags from audio files (such as ID3 tags in MP3 files, Vorbis comments in FLAC/OGG files, etc.) and use them to create more meaningful filenames or display information about your audio collection.
@@ -666,81 +776,7 @@ tonietoolbox "C:\Music\Classical\Bach" --use-media-tags --name-template "{compos
 The first command shows what tags are available, allowing you to create precise naming templates for classical music collections.
 
 ## Technical Details
-
-### TAF (Tonie Audio Format) File Structure
-
-The Tonie Audio Format (TAF) consists of several parts:
-
-#### 1. Tonie Header (0x1000 bytes)
-
-Located at the beginning of the file, structured as:
-
-- A 4-byte big-endian integer specifying the header length
-- A Protocol Buffer encoded header (defined in `tonie_header.proto`)
-- Padding to fill the entire 4096 bytes (0x1000)
-
-The Protocol Buffer structure contains:
-
-```protobuf
-message TonieHeader {
-  bytes dataHash = 1;      // SHA1 hash of the audio data
-  uint32 dataLength = 2;   // Length of the audio data in bytes
-  uint32 timestamp = 3;    // Unix timestamp (also used as bitstream serial number)
-  repeated uint32 chapterPages = 4 [packed=true];  // Page numbers for chapter starts
-  bytes padding = 5;       // Padding to fill up the header
-}
-```
-
-#### 2. Audio Data
-
-The audio data consists of:
-
-- Opus encoded audio in Ogg container format
-- Every page after the header has a fixed size of 4096 bytes (0x1000)
-- First page contains the Opus identification header
-- Second page contains the Opus comments/tags
-- Remaining pages contain the actual audio data
-- All pages use the same bitstream serial number (timestamp from header)
-
-#### 3. Special Requirements
-
-For optimal compatibility with Tonie boxes:
-
-- Audio should be stereo (2 channels)
-- Sample rate must be 48 kHz
-- Pages must be aligned to 4096 byte boundaries
-- Bitrate of 96 kbps VBR is recommended
-
-**Mono audio handling:**
-
-- By default, TonieToolbox will automatically convert mono audio files to stereo for compatibility.
-- To disable this behavior (and require your input to already be stereo), use the `--no-mono-conversion` flag.
-
-### File Analysis
-
-When using the `--info` flag, TonieToolbox checks and displays detailed information about a .TAF (Tonie Audio File):
-
-- SHA1 hash validation
-- Timestamp/bitstream serial consistency
-- Opus data length verification
-- Opus header validation (version, channels, sample rate)
-- Page alignment and size validation
-- Total runtime
-- Track listing with durations
-
-### File Comparison
-
-When using the `--compare` flag, TonieToolbox provides a detailed comparison of two .TAF files:
-
-- File size comparison
-- Header size verification
-- Timestamp comparison
-- Data length validation
-- SHA1 hash verification
-- Chapter page structure analysis
-- OGG page-by-page comparison (with `--detailed-compare` flag)
-
-This is particularly useful for debugging when creating TAF files with different tools or parameters.
+[Moved to TECHNICAL.md](TECHNICAL.md)
 
 ## Related Projects
 
@@ -750,9 +786,6 @@ This project is inspired by and builds upon the work of other Tonie-related open
 - [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud) - Self-hosted alternative to the Tonie cloud / Boxine cloud for managing custom content
 - [TeddyCloudStarter](https://github.com/Quentendo64/TeddyCloudStarter) - A Wizard for Docker-based deployment of [teddycloud](https://github.com/toniebox-reverse-engineering/teddycloud)
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Legal Notice
 

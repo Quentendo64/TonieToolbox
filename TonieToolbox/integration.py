@@ -25,24 +25,26 @@ def handle_integration(args):
             else:
                 logger.error("Integration uninstallation failed.")
                 return False
+    #elif platform.system() == 'Darwin':
+    #    from .integration_macos import MacOSContextMenuIntegration as ContextMenuIntegration
+    #    if args.install_integration:
+    #        success = ContextMenuIntegration.install()
+    #        if success:
+    #            logger.info("Integration installed successfully.")
+    #            return True
+    #        else:
+    #            logger.error("Integration installation failed.")
+    #            return False
+    #    elif args.uninstall_integration:
+    #        success = ContextMenuIntegration.uninstall()
+    #        if success:
+    #            logger.info("Integration uninstalled successfully.")
+    #            return True
+    #        else:
+    #            logger.error("Integration uninstallation failed.")
+    #            return False
     elif platform.system() == 'Darwin':
-        from .integration_macos import MacOSContextMenuIntegration as ContextMenuIntegration
-        if args.install_integration:
-            success = ContextMenuIntegration.install()
-            if success:
-                logger.info("Integration installed successfully.")
-                return True
-            else:
-                logger.error("Integration installation failed.")
-                return False
-        elif args.uninstall_integration:
-            success = ContextMenuIntegration.uninstall()
-            if success:
-                logger.info("Integration uninstalled successfully.")
-                return True
-            else:
-                logger.error("Integration uninstallation failed.")
-                return False
+        raise NotImplementedError("Context menu integration is not supported on MacOS YET. But Soon™")
     elif platform.system() == 'Linux':
         raise NotImplementedError("Context menu integration is not supported on Linux YET. But Soon™")
     else:
