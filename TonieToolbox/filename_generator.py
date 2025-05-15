@@ -91,3 +91,51 @@ def guess_output_filename(input_filename: str, input_files: list[str] = None) ->
         # Files might be on different drives
         logger.debug("Could not determine common path, using generic name")
         return "tonie_collection"
+
+def apply_template_to_path(template, metadata):
+    """
+    Apply metadata to a path template and ensure the path is valid.
+    
+    Args:
+        template: String template with {tag} placeholders
+        metadata: Dictionary of tag values
+        
+    Returns:
+        Formatted path with placeholders replaced by actual values
+    """
+    if not template or not metadata:
+        return None
+        
+    try:
+        # Replace any tags in the path with their values
+        formatted_path = template
+        for tag, value in metadata.items():
+            if value:
+                # Sanitize value for use in path
+                safe_value = re.sub(r'[<>:"|?*]', '_', str(value))
+                # Replace forward slashes with appropriate character, but NOT hyphens
+                safe_value = safe_value.replace('/', ' - ')
+                # Remove leading/trailing whitespace and dots
+                safe_value = safe_value.strip('. \t')
+                if not safe_value:
+                    safe_value = "unknown"
+
+                placeholder = '{' + tag + '}'
+                formatted_path = formatted_path.replace(placeholder, safe_value)
+        
+        # Check if there are any remaining placeholders
+        if re.search(r'{[^}]+}', formatted_path):
+            return None  # Some placeholders couldn't be filled
+            
+        # Normalize path separators for the OS
+        formatted_path = os.path.normpath(formatted_path)
+        return formatted_path
+    except Exception as e:
+        logger.error(f"Error applying template to path: {e}")
+        return None
+
+def ensure_directory_exists(file_path):
+    """Create the directory structure for a given file path if it doesn't exist."""
+    directory = os.path.dirname(file_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)

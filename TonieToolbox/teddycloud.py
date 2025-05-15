@@ -382,7 +382,7 @@ class TeddyCloudClient:
         except Exception as e:
             logger.warning(f"Failed to save paths cache: {e}")
     
-    def create_directories_recursive(self, path: str, overlay: str = None, special: str = None) -> str:
+    def create_directories_recursive(self, path: str, overlay: str = None, special: str = "library") -> str:
         """
         Create directories recursively on the TeddyCloud server.
 

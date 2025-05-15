@@ -13,7 +13,7 @@ from .tonie_file import create_tonie_file
 from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
-from .filename_generator import guess_output_filename
+from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders
 from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
@@ -41,7 +41,7 @@ def main():
     teddycloud_group.add_argument('--special-folder', action='store', metavar='FOLDER',
                        help='Special folder to upload to (currently only "library" is supported)', default='library')
     teddycloud_group.add_argument('--path', action='store', metavar='PATH',
-                       help='Path where to write the file on TeddyCloud server')
+                       help='Path where to write the file on TeddyCloud server (supports templates like "/{albumartist}/{album}")')
     teddycloud_group.add_argument('--connection-timeout', type=int, metavar='SECONDS', default=10,
                        help='Connection timeout in seconds (default: 10)')
     teddycloud_group.add_argument('--read-timeout', type=int, metavar='SECONDS', default=300,
@@ -112,7 +112,9 @@ def main():
     media_tag_group.add_argument('-m', '--use-media-tags', action='store_true',
                        help='Use media tags from audio files for naming')
     media_tag_group.add_argument('--name-template', metavar='TEMPLATE', action='store',
-                       help='Template for naming files using media tags. Example: "{album} - {artist}"')
+                       help='Template for naming files using media tags. Example: "{albumartist} - {album}"')
+    media_tag_group.add_argument('--output-to-template', metavar='PATH_TEMPLATE', action='store',
+                       help='Template for output path using media tags. Example: "C:\\Music\\{albumartist}\\{album}"')
     media_tag_group.add_argument('--show-tags', action='store_true',
                        help='Show available media tags from input files')
     # ------------- Parser - Version handling -------------
@@ -279,8 +281,33 @@ def main():
                       file_path, file_size, file_ext)
             logger.info("Uploading %s to TeddyCloud %s", file_path, teddycloud_url)
             logger.trace("Starting upload process for %s", file_path)
+            
+            upload_path = args.path
+            if upload_path and '{' in upload_path and args.use_media_tags:
+                metadata = get_file_tags(file_path)
+                if metadata:
+                    formatted_path = apply_template_to_path(upload_path, metadata)
+                    if formatted_path:
+                        logger.info("Using dynamic upload path from template: %s", formatted_path)
+                        upload_path = formatted_path
+                    else:
+                        logger.warning("Could not apply all tags to path template '%s'. Using as-is.", upload_path)
+            
+            # Create directories recursively if path is provided
+            if upload_path:
+                logger.debug("Creating directory structure on server: %s", upload_path)
+                try:
+                    client.create_directories_recursive(
+                        path=upload_path, 
+                        special=args.special_folder
+                    )
+                    logger.debug("Successfully created directory structure on server")
+                except Exception as e:
+                    logger.warning("Failed to create directory structure on server: %s", str(e))
+                    logger.debug("Continuing with upload anyway, in case the directory already exists")
+            
             response = client.upload_file(
-                destination_path=args.path, 
+                destination_path=upload_path, 
                 file_path=file_path,                   
                 special=args.special_folder,
             )
@@ -483,25 +510,25 @@ def main():
     
     guessed_name = None
     if args.use_media_tags:
+        logger.debug("Using media tags for naming")
         if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
+            logger.debug("Multiple files in the same folder, trying to extract album info")
             folder_path = os.path.dirname(files[0])            
             logger.debug("Extracting album info from folder: %s", folder_path)            
             album_info = extract_album_info(folder_path)
             if album_info:
-                template = args.name_template or "{album} - {artist}"
-                new_name = format_metadata_filename(album_info, template)
-                
+                template = args.name_template or "{artist} - {album}"
+                new_name = format_metadata_filename(album_info, template)                
                 if new_name:
                     logger.info("Using album metadata for output filename: %s", new_name)
                     guessed_name = new_name
                 else:
                     logger.debug("Could not format filename from album metadata")
         elif len(files) == 1:
-
-            
             tags = get_file_tags(files[0])
             if tags:
-                template = args.name_template or "{title} - {artist}"
+                logger.debug("")
+                template = args.name_template or "{artist} - {title}"
                 new_name = format_metadata_filename(tags, template)
                 
                 if new_name:
@@ -538,20 +565,71 @@ def main():
                 else:
                     logger.debug("Could not format filename from common metadata")
 
-    if args.output_filename:
+    if args.output_filename:        
         out_filename = args.output_filename
+        logger.debug("Output filename specified: %s", out_filename)
+    elif args.output_to_template and args.use_media_tags:
+        # Get metadata from files
+        if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
+            metadata = extract_album_info(os.path.dirname(files[0]))
+        elif len(files) == 1:
+            metadata = get_file_tags(files[0])
+        else:
+            # Try to get common tags for multiple files
+            metadata = {}
+            for file_path in files:
+                tags = get_file_tags(file_path)
+                if tags:
+                    for key, value in tags.items():
+                        if key not in metadata:
+                            metadata[key] = value
+                        elif metadata[key] != value:
+                            metadata[key] = None
+            metadata = {k: v for k, v in metadata.items() if v is not None}
+        
+        if metadata:
+            formatted_path = apply_template_to_path(args.output_to_template, metadata)
+            logger.debug("Formatted path from template: %s", formatted_path)
+            if formatted_path:
+                ensure_directory_exists(formatted_path)
+                if guessed_name:
+                    logger.debug("Using guessed name for output: %s", guessed_name)
+                    out_filename = os.path.join(formatted_path, guessed_name)
+                else:
+                    logger.debug("Using template path for output: %s", formatted_path)
+                    out_filename = formatted_path
+                logger.info("Using template path for output: %s", out_filename)
+            else:
+                logger.warning("Could not apply template to path. Using default output location.")
+                # Fall back to default output handling
+                if guessed_name:
+                    logger.debug("Using guessed name for output: %s", guessed_name)
+                    if args.output_to_source:
+                        source_dir = os.path.dirname(files[0]) if files else '.'
+                        out_filename = os.path.join(source_dir, guessed_name)
+                        logger.debug("Using source location for output: %s", out_filename)
+                    else:
+                        output_dir = './output'
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir, exist_ok=True)
+                        out_filename = os.path.join(output_dir, guessed_name)
+                        logger.debug("Using default output location: %s", out_filename)
+        else:
+            logger.warning("No metadata available to apply to template path. Using default output location.")
+            # Fall back to default output handling
     elif guessed_name:
+        logger.debug("Using guessed name for output: %s", guessed_name)
         if args.output_to_source:
             source_dir = os.path.dirname(files[0]) if files else '.'
             out_filename = os.path.join(source_dir, guessed_name)
-            logger.debug("Using source location for output with media tags: %s", out_filename)
+            logger.debug("Using source location for output: %s", out_filename)
         else:
             output_dir = './output'
             if not os.path.exists(output_dir):
                 logger.debug("Creating default output directory: %s", output_dir)
                 os.makedirs(output_dir, exist_ok=True)
             out_filename = os.path.join(output_dir, guessed_name)
-            logger.debug("Using default output location with media tags: %s", out_filename)
+            logger.debug("Using default output location: %s", out_filename)
     else:
         guessed_name = guess_output_filename(args.input_filename, files)    
         if args.output_to_source:
@@ -581,6 +659,7 @@ def main():
     
     if not out_filename.lower().endswith('.taf'):
         out_filename += '.taf'
+    ensure_directory_exists(out_filename)
         
     logger.info("Creating Tonie file: %s with %d input file(s)", out_filename, len(files))
     create_tonie_file(out_filename, files, args.no_tonie_header, args.user_timestamp,
@@ -591,10 +670,48 @@ def main():
     
     # ------------- Single File Upload -------------  
     artwork_url = None
-    if args.upload:                
+    if args.upload:
+        upload_path = args.path
+        if upload_path and '{' in upload_path and args.use_media_tags:
+            metadata = {}
+            if len(files) > 1 and os.path.dirname(files[0]) == os.path.dirname(files[-1]):
+                metadata = extract_album_info(os.path.dirname(files[0]))
+            elif len(files) == 1:
+                metadata = get_file_tags(files[0])
+            else:
+                for file_path in files:
+                    tags = get_file_tags(file_path)
+                    if tags:
+                        for key, value in tags.items():
+                            if key not in metadata:
+                                metadata[key] = value
+                            elif metadata[key] != value:
+                                metadata[key] = None
+                metadata = {k: v for k, v in metadata.items() if v is not None}
+            if metadata:
+                formatted_path = apply_template_to_path(upload_path, metadata)
+                if formatted_path:
+                    logger.info("Using dynamic upload path from template: %s", formatted_path)
+                    upload_path = formatted_path
+                else:
+                    logger.warning("Could not apply all tags to path template '%s'. Using as-is.", upload_path)
+        
+        # Create directories recursively if path is provided
+        if upload_path:
+            logger.debug("Creating directory structure on server: %s", upload_path)
+            try:
+                client.create_directories_recursive(
+                    path=upload_path, 
+                    special=args.special_folder
+                )
+                logger.debug("Successfully created directory structure on server")
+            except Exception as e:
+                logger.warning("Failed to create directory structure on server: %s", str(e))
+                logger.debug("Continuing with upload anyway, in case the directory already exists")
+        
         response = client.upload_file(
             file_path=out_filename,
-            destination_path=args.path,                    
+            destination_path=upload_path,                    
             special=args.special_folder,
         )
         upload_success = response.get('success', False)
