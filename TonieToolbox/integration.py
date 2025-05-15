@@ -59,11 +59,13 @@ def handle_config():
         return
     if platform.system() == "Windows":
         from .integration_windows import WindowsClassicContextMenuIntegration as ContextMenuIntegration
-        ContextMenuIntegration._apply_config_template()
+        context_menu = ContextMenuIntegration()
+        context_menu._apply_config_template()
         os.startfile(config_path)
     elif platform.system() == "Darwin":
         from .integration_macos import MacOSContextMenuIntegration as ContextMenuIntegration
-        ContextMenuIntegration._apply_config_template()
+        context_menu = ContextMenuIntegration()
+        context_menu._apply_config_template()
         subprocess.call(["open", config_path])
     elif platform.system() == "Linux":
         subprocess.call(["xdg-open", config_path])
