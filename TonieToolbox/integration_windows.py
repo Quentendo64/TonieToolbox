@@ -284,11 +284,11 @@ class WindowsClassicContextMenuIntegration:
             reg_lines.append(f'@="{self._reg_escape(self.upload_taf_artwork_json_cmd)}"')
             reg_lines.append('')
         # Compare TAF Files
-        reg_lines.append(f'[HKEY_CLASSES_ROOT\\SystemFileAssociations\\.taf\\shell\\{self.cascade_name}\\shell\\f_CompareTaf]')
-        reg_lines.append('@="Compare with another .taf file"')
-        reg_lines.append(f'[HKEY_CLASSES_ROOT\\SystemFileAssociations\\.taf\\shell\\{self.cascade_name}\\shell\\f_CompareTaf\\command]')
-        reg_lines.append(f'@="{self._reg_escape(self.compare_taf_cmd)}"')
-        reg_lines.append('')
+        #reg_lines.append(f'[HKEY_CLASSES_ROOT\\SystemFileAssociations\\.taf\\shell\\{self.cascade_name}\\shell\\f_CompareTaf]')
+        #reg_lines.append('@="Compare with another .taf file"')
+        #reg_lines.append(f'[HKEY_CLASSES_ROOT\\SystemFileAssociations\\.taf\\shell\\{self.cascade_name}\\shell\\f_CompareTaf\\command]')
+        #reg_lines.append(f'@="{self._reg_escape(self.compare_taf_cmd)}"')
+        #reg_lines.append('')
         return reg_lines
 
     def _generate_folder_entries(self):

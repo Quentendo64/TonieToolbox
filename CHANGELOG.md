@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0rc2] - 2025-05-15
+
+
+### Fixed
+- Error when using --install-integration caused by a distracted developer who forgot to comment on something. Silly™ 
+
 ## [0.6.0rc1] - 2025-05-15
 
 ### Added
