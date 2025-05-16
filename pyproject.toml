@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "TonieToolbox"
 dynamic = ["version"]
-description = "Create files for the Tonie box and interact with TeddyCloud servers"
+description = "Convert audio files to Toniebox compatible format (.TAF) and interact with TeddyCloud."
 readme = "README.md"
 requires-python = ">=3.7"
 license = "GPL-3.0-or-later"
@@ -26,7 +26,8 @@ dependencies = [
     "protobuf<=3.19.0",
     "requests>=2.32.3",
     "mutagen>=1.47.0",
-    "packaging>=25.0"
+    "packaging>=25.0",
+    "tqdm>=4.67.1"
 ]
 
 [project.optional-dependencies]

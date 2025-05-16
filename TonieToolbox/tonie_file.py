@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Tonie file operations module
 """
@@ -15,17 +16,17 @@ from .ogg_page import OggPage
 from .constants import OPUS_TAGS, SAMPLE_RATE_KHZ, TIMESTAMP_DEDUCT
 from .logger import get_logger
 
-logger = get_logger('tonie_file')
+logger = get_logger(__name__)
 
 
-def toniefile_comment_add(buffer, length, comment_str):
+def toniefile_comment_add(buffer: bytearray, length: int, comment_str: str) -> int:
     """
     Add a comment string to an Opus comment packet buffer.
     
     Args:
-        buffer: Bytearray buffer to add comment to
-        length: Current position in the buffer
-        comment_str: Comment string to add
+        buffer (bytearray): Bytearray buffer to add comment to
+        length (int): Current position in the buffer
+        comment_str (str): Comment string to add
         
     Returns:
         int: New position in the buffer after adding comment
@@ -44,7 +45,7 @@ def toniefile_comment_add(buffer, length, comment_str):
     return length
 
 
-def check_identification_header(page):
+def check_identification_header(page) -> None:
     """
     Check if a page contains a valid Opus identification header.
     
@@ -77,16 +78,16 @@ def check_identification_header(page):
     logger.debug("Opus identification header is valid")
 
 
-def prepare_opus_tags(page, custom_tags=False, bitrate=64, vbr=True, opus_binary=None):
+def prepare_opus_tags(page, custom_tags: bool = False, bitrate: int = 64, vbr: bool = True, opus_binary: str = None) -> OggPage:
     """
     Prepare standard Opus tags for a Tonie file.
     
     Args:
         page: OggPage to modify
-        custom_tags: Whether to use custom TonieToolbox tags instead of default ones
-        bitrate: Actual bitrate used for encoding
-        vbr: Whether variable bitrate was used
-        opus_binary: Path to opusenc binary for version detection
+        custom_tags (bool): Whether to use custom TonieToolbox tags instead of default ones
+        bitrate (int): Actual bitrate used for encoding
+        vbr (bool): Whether variable bitrate was used
+        opus_binary (str | None): Path to opusenc binary for version detection
         
     Returns:
         OggPage: Modified page with Tonie-compatible Opus tags
@@ -162,19 +163,28 @@ def prepare_opus_tags(page, custom_tags=False, bitrate=64, vbr=True, opus_binary
     return page
 
 
-def copy_first_and_second_page(in_file, out_file, timestamp, sha, use_custom_tags=True, bitrate=64, vbr=True, opus_binary=None):
+def copy_first_and_second_page(
+    in_file,
+    out_file,
+    timestamp: int,
+    sha,
+    use_custom_tags: bool = True,
+    bitrate: int = 64,
+    vbr: bool = True,
+    opus_binary: str = None
+) -> None:
     """
     Copy and modify the first two pages of an Opus file for a Tonie file.
     
     Args:
         in_file: Input file handle
         out_file: Output file handle
-        timestamp: Timestamp to use for the Tonie file
+        timestamp (int): Timestamp to use for the Tonie file
         sha: SHA1 hash object to update with written data
-        use_custom_tags: Whether to use custom TonieToolbox tags
-        bitrate: Actual bitrate used for encoding
-        vbr: Whether VBR was used
-        opus_binary: Path to opusenc binary
+        use_custom_tags (bool): Whether to use custom TonieToolbox tags
+        bitrate (int): Actual bitrate used for encoding
+        vbr (bool): Whether VBR was used
+        opus_binary (str | None): Path to opusenc binary
     """
     logger.debug("Copying first and second pages with timestamp %d", timestamp)
     found = OggPage.seek_to_page_header(in_file)
@@ -202,7 +212,7 @@ def copy_first_and_second_page(in_file, out_file, timestamp, sha, use_custom_tag
     logger.debug("Second page written successfully")
 
 
-def skip_first_two_pages(in_file):
+def skip_first_two_pages(in_file) -> None:
     """
     Skip the first two pages of an Opus file.
     
@@ -235,7 +245,7 @@ def skip_first_two_pages(in_file):
     logger.debug("First two pages skipped successfully")
 
 
-def read_all_remaining_pages(in_file):
+def read_all_remaining_pages(in_file) -> list:
     """
     Read all remaining OGG pages from an input file.
     
@@ -260,19 +270,26 @@ def read_all_remaining_pages(in_file):
     return remaining_pages
 
 
-def resize_pages(old_pages, max_page_size, first_page_size, template_page, last_granule=0, start_no=2,
-                set_last_page_flag=False):
+def resize_pages(
+    old_pages: list,
+    max_page_size: int,
+    first_page_size: int,
+    template_page,
+    last_granule: int = 0,
+    start_no: int = 2,
+    set_last_page_flag: bool = False
+) -> list:
     """
     Resize OGG pages to fit Tonie requirements.
     
     Args:
-        old_pages: List of original OggPage objects
-        max_page_size: Maximum size for pages
-        first_page_size: Size for the first page
+        old_pages (list): List of original OggPage objects
+        max_page_size (int): Maximum size for pages
+        first_page_size (int): Size for the first page
         template_page: Template OggPage to use for creating new pages
-        last_granule: Last granule position
-        start_no: Starting page number
-        set_last_page_flag: Whether to set the last page flag
+        last_granule (int): Last granule position
+        start_no (int): Starting page number
+        set_last_page_flag (bool): Whether to set the last page flag
         
     Returns:
         list: List of resized OggPage objects
@@ -326,14 +343,14 @@ def resize_pages(old_pages, max_page_size, first_page_size, template_page, last_
     return new_pages
 
 
-def fix_tonie_header(out_file, chapters, timestamp, sha):
+def fix_tonie_header(out_file, chapters: list, timestamp: int, sha) -> None:
     """
     Fix the Tonie header in a file.
     
     Args:
         out_file: Output file handle
-        chapters: List of chapter page numbers
-        timestamp: Timestamp for the Tonie file
+        chapters (list): List of chapter page numbers
+        timestamp (int): Timestamp for the Tonie file
         sha: SHA1 hash object with file content
     """
     logger.info("Writing Tonie header with %d chapters and timestamp %d", len(chapters), timestamp)
@@ -362,25 +379,36 @@ def fix_tonie_header(out_file, chapters, timestamp, sha):
     logger.debug("Tonie header written successfully (size: %d bytes)", len(header))
 
 
-def create_tonie_file(output_file, input_files, no_tonie_header=False, user_timestamp=None,
-                     bitrate=96, vbr=True, ffmpeg_binary=None, opus_binary=None, keep_temp=False, auto_download=False, 
-                     use_custom_tags=True, no_mono_conversion=False):
+def create_tonie_file(
+    output_file: str,
+    input_files: list[str],
+    no_tonie_header: bool = False,
+    user_timestamp: str = None,
+    bitrate: int = 96,
+    vbr: bool = True,
+    ffmpeg_binary: str = None,
+    opus_binary: str = None,
+    keep_temp: bool = False,
+    auto_download: bool = False,
+    use_custom_tags: bool = True,
+    no_mono_conversion: bool = False
+) -> None:
     """
     Create a Tonie file from input files.
     
     Args:
-        output_file: Output file path
-        input_files: List of input file paths
-        no_tonie_header: Whether to omit the Tonie header
-        user_timestamp: Custom timestamp to use
-        bitrate: Bitrate for encoding in kbps
-        vbr: Whether to use variable bitrate encoding (True) or constant (False)
-        ffmpeg_binary: Path to ffmpeg binary
-        opus_binary: Path to opusenc binary
-        keep_temp: Whether to keep temporary opus files for testing
-        auto_download: Whether to automatically download dependencies if not found
-        use_custom_tags: Whether to use dynamic comment tags generated with toniefile_comment_add
-        no_mono_conversion: Whether to skip mono conversion during audio processing
+        output_file (str): Output file path
+        input_files (list[str]): List of input file paths
+        no_tonie_header (bool): Whether to omit the Tonie header
+        user_timestamp (str | None): Custom timestamp to use
+        bitrate (int): Bitrate for encoding in kbps
+        vbr (bool): Whether to use variable bitrate encoding (True) or constant (False)
+        ffmpeg_binary (str | None): Path to ffmpeg binary
+        opus_binary (str | None): Path to opusenc binary
+        keep_temp (bool): Whether to keep temporary opus files for testing
+        auto_download (bool): Whether to automatically download dependencies if not found
+        use_custom_tags (bool): Whether to use dynamic comment tags generated with toniefile_comment_add
+        no_mono_conversion (bool): Whether to skip mono conversion during audio processing
     """
     from .audio_conversion import get_opus_tempfile
     

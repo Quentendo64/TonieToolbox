@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 TonieToolbox module for handling the tonies.custom.json operations.
 
@@ -19,7 +20,7 @@ from .media_tags import get_file_tags, extract_album_info
 from .constants import LANGUAGE_MAPPING, GENRE_MAPPING
 from .teddycloud import TeddyCloudClient
 
-logger = get_logger('tonies_json')
+logger = get_logger(__name__)
 
 class ToniesJsonHandlerv1:
     """Handler for tonies.custom.json operations using v1 format."""
@@ -29,7 +30,7 @@ class ToniesJsonHandlerv1:
         Initialize the handler.
         
         Args:
-            client: TeddyCloudClient instance to use for API communication
+            client (TeddyCloudClient | None): TeddyCloudClient instance to use for API communication
         """    
         self.client = client
         self.custom_json = []
@@ -40,7 +41,7 @@ class ToniesJsonHandlerv1:
         Load tonies.custom.json from the TeddyCloud server.
         
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """          
         if self.client is None:
             logger.error("Cannot load from server: no client provided")
@@ -71,10 +72,10 @@ class ToniesJsonHandlerv1:
         Load tonies.custom.json from a local file.
         
         Args:
-            file_path: Path to the tonies.custom.json file
+            file_path (str): Path to the tonies.custom.json file
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         try:
             if os.path.exists(file_path):
@@ -109,10 +110,10 @@ class ToniesJsonHandlerv1:
         Save tonies.custom.json to a local file.
         
         Args:
-            file_path: Path where to save the tonies.custom.json file
+            file_path (str): Path where to save the tonies.custom.json file
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         if not self.is_loaded:
             logger.error("Cannot save tonies.custom.json: data not loaded")
@@ -131,10 +132,13 @@ class ToniesJsonHandlerv1:
             logger.error("Error saving tonies.custom.json to file: %s", e)
             return False
     
-    def renumber_series_entries(self, series: str):
+    def renumber_series_entries(self, series: str) -> None:
         """
         Re-sort and re-number all entries for a series by year (chronological),
         with entries without a year coming last.
+        
+        Args:
+            series (str): Series name to renumber
         """
         # Collect all entries for the series
         series_entries = [entry for entry in self.custom_json if entry.get('series') == series]
@@ -167,12 +171,12 @@ class ToniesJsonHandlerv1:
         If an entry with the same series+episodes exists, the new hash will be added to it.
         
         Args:
-            taf_file: Path to the TAF file
-            input_files: List of input audio files used to create the TAF
-            artwork_url: URL of the uploaded artwork (if any)
+            taf_file (str): Path to the TAF file
+            input_files (list[str]): List of input audio files used to create the TAF
+            artwork_url (str | None): URL of the uploaded artwork (if any)
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         logger.trace("Entering add_entry_from_taf() with taf_file=%s, input_files=%s, artwork_url=%s", 
                     taf_file, input_files, artwork_url)
@@ -329,12 +333,12 @@ class ToniesJsonHandlerv1:
         2. For entries without years: assign the next available number after those with years
         
         Args:
-            series: Series name
-            episodes: Episodes name
-            year: Release year from metadata, if available
+            series (str): Series name
+            episodes (str): Episodes name
+            year (int | None): Release year from metadata, if available
             
         Returns:
-            Generated entry number as string
+            str: Generated entry number as string
         """
         logger.trace("Entering _generate_entry_no() with series='%s', episodes='%s', year=%s", 
                     series, episodes, year)
@@ -443,10 +447,10 @@ class ToniesJsonHandlerv1:
         Extract a year (1900-2099) from text.
         
         Args:
-            text: The text to extract the year from
+            text (str): The text to extract the year from
             
         Returns:
-            The extracted year as int, or None if no valid year found
+            int | None: The extracted year as int, or None if no valid year found
         """
         import re
         year_pattern = re.compile(r'(19\d{2}|20\d{2})')
@@ -467,11 +471,11 @@ class ToniesJsonHandlerv1:
         Format a number to match the existing entry number format (e.g., with leading zeros).
         
         Args:
-            number: The number to format
-            existing_entries: List of existing entries with their numbers
+            number (int): The number to format
+            existing_entries (list[dict]): List of existing entries with their numbers
             
         Returns:
-            Formatted number as string
+            str: Formatted number as string
         """
         max_digits = 1
         for entry in existing_entries:
@@ -492,7 +496,7 @@ class ToniesJsonHandlerv1:
         Generate a unique model number for a new entry.
         
         Returns:
-            Unique model number in the format "model-" followed by sequential number with zero padding
+            str: Unique model number in the format "model-" followed by sequential number with zero padding
         """
         logger.trace("Entering _generate_model_number()")
         highest_num = -1
@@ -525,10 +529,10 @@ class ToniesJsonHandlerv1:
         Determine the category in v1 format.
         
         Args:
-            metadata: Dictionary containing file metadata
+            metadata (dict): Dictionary containing file metadata
             
         Returns:
-            Category string in v1 format
+            str: Category string in v1 format
         """
         if 'genre' in metadata:
             genre_value = metadata['genre'].lower().strip()
@@ -551,10 +555,10 @@ class ToniesJsonHandlerv1:
         Find an entry in the custom JSON by TAF hash.
         
         Args:
-            taf_hash: SHA1 hash of the TAF file to find
+            taf_hash (str): SHA1 hash of the TAF file to find
             
         Returns:
-            Tuple of (entry, entry_index) if found, or (None, None) if not found
+            tuple[dict | None, int | None]: Tuple of (entry, entry_index) if found, or (None, None) if not found
         """
         logger.trace("Searching for entry with hash %s", taf_hash)
         
@@ -575,11 +579,11 @@ class ToniesJsonHandlerv1:
         Find an entry in the custom JSON by series and episodes.
         
         Args:
-            series: Series name to find
-            episodes: Episodes name to find
+            series (str): Series name to find
+            episodes (str): Episodes name to find
             
         Returns:
-            Tuple of (entry, entry_index) if found, or (None, None) if not found
+            tuple[dict | None, int | None]: Tuple of (entry, entry_index) if found, or (None, None) if not found
         """
         logger.trace("Searching for entry with series='%s', episodes='%s'", series, episodes)
         
@@ -596,10 +600,10 @@ class ToniesJsonHandlerv1:
         Extract metadata from audio files to use in the custom JSON entry.
         
         Args:
-            input_files: List of paths to audio files
+            input_files (list[str]): List of paths to audio files
             
         Returns:
-            Dictionary containing metadata extracted from files
+            dict: Dictionary containing metadata extracted from files
         """
         metadata = {}
         track_descriptions = []
@@ -638,10 +642,10 @@ class ToniesJsonHandlerv1:
         Convert data from v2 format to v1 format.
         
         Args:
-            v2_data: Data in v2 format
+            v2_data (list[dict]): Data in v2 format
             
         Returns:
-            Converted data in v1 format
+            list[dict]: Converted data in v1 format
         """
         v1_data = []
         
@@ -687,10 +691,10 @@ class ToniesJsonHandlerv1:
         Convert category from v2 format to v1 format.
         
         Args:
-            v2_category: Category in v2 format
+            v2_category (str): Category in v2 format
             
         Returns:
-            Category in v1 format
+            str: Category in v1 format
         """
         v2_to_v1_mapping = {
             "music": "music",
@@ -710,7 +714,7 @@ class ToniesJsonHandlerv2:
         Initialize the handler.
         
         Args:
-            client: TeddyCloudClient instance to use for API communication
+            client (TeddyCloudClient | None): TeddyCloudClient instance to use for API communication
         """    
         self.client = client
         self.custom_json = []
@@ -721,7 +725,7 @@ class ToniesJsonHandlerv2:
         Load tonies.custom.json from the TeddyCloud server.
         
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """          
         if self.client is None:
             logger.error("Cannot load from server: no client provided")
@@ -747,10 +751,10 @@ class ToniesJsonHandlerv2:
         Load tonies.custom.json from a local file.
         
         Args:
-            file_path: Path to the tonies.custom.json file
+            file_path (str): Path to the tonies.custom.json file
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         try:
             if os.path.exists(file_path):
@@ -780,10 +784,10 @@ class ToniesJsonHandlerv2:
         Save tonies.custom.json to a local file.
         
         Args:
-            file_path: Path where to save the tonies.custom.json file
+            file_path (str): Path where to save the tonies.custom.json file
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         if not self.is_loaded:
             logger.error("Cannot save tonies.custom.json: data not loaded")
@@ -809,12 +813,12 @@ class ToniesJsonHandlerv2:
         If an entry with the same series+episode exists, the new hash will be added to it.
         
         Args:
-            taf_file: Path to the TAF file
-            input_files: List of input audio files used to create the TAF
-            artwork_url: URL of the uploaded artwork (if any)
+            taf_file (str): Path to the TAF file
+            input_files (list[str]): List of input audio files used to create the TAF
+            artwork_url (str | None): URL of the uploaded artwork (if any)
             
         Returns:
-            True if successful, False otherwise
+            bool: True if successful, False otherwise
         """
         logger.trace("Entering add_entry_from_taf() with taf_file=%s, input_files=%s, artwork_url=%s", 
                     taf_file, input_files, artwork_url)
@@ -915,7 +919,7 @@ class ToniesJsonHandlerv2:
         Generate a unique article ID for a new entry.
         
         Returns:
-            Unique article ID in the format "tt-42" followed by sequential number starting from 0
+            str: Unique article ID in the format "tt-42" followed by sequential number starting from 0
         """
         logger.trace("Entering _generate_article_id()")
         highest_num = -1
@@ -948,10 +952,10 @@ class ToniesJsonHandlerv2:
         Extract metadata from audio files to use in the custom JSON entry.
         
         Args:
-            input_files: List of paths to audio files
+            input_files (list[str]): List of paths to audio files
             
         Returns:
-            Dictionary containing metadata extracted from files
+            dict: Dictionary containing metadata extracted from files
         """
         metadata = {}
         track_descriptions = []
@@ -1043,10 +1047,10 @@ class ToniesJsonHandlerv2:
         Find an entry in the custom JSON by TAF hash.
         
         Args:
-            taf_hash: SHA1 hash of the TAF file to find
+            taf_hash (str): SHA1 hash of the TAF file to find
             
         Returns:
-            Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
+            tuple[dict | None, int | None, int | None]: Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
         """
         logger.trace("Searching for entry with hash %s", taf_hash)
         
@@ -1071,11 +1075,11 @@ class ToniesJsonHandlerv2:
         Find an entry in the custom JSON by series and episode.
         
         Args:
-            series: Series name to find
-            episode: Episode name to find
+            series (str): Series name to find
+            episode (str): Episode name to find
             
         Returns:
-            Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
+            tuple[dict | None, int | None, int | None]: Tuple of (entry, entry_index, data_index) if found, or (None, None, None) if not found
         """
         logger.trace("Searching for entry with series='%s', episode='%s'", series, episode)
         
@@ -1096,10 +1100,10 @@ class ToniesJsonHandlerv2:
         Calculate the total runtime in minutes from a list of audio files.
 
         Args:
-            input_files: List of paths to audio files
+            input_files (list[str]): List of paths to audio files
 
         Returns:
-            Total runtime in minutes (rounded to the nearest minute)
+            int: Total runtime in minutes (rounded to the nearest minute)
         """
         logger.trace("Entering _calculate_runtime() with %d input files", len(input_files))
         total_runtime_seconds = 0
@@ -1166,14 +1170,14 @@ def fetch_and_update_tonies_json_v1(client: TeddyCloudClient, taf_file: Optional
     Fetch tonies.custom.json from server and merge with local file if it exists, then update with new entry in v1 format.
     
     Args:
-        client: TeddyCloudClient instance to use for API communication
-        taf_file: Path to the TAF file to add
-        input_files: List of input audio files used to create the TAF
-        artwork_url: URL of the uploaded artwork (if any)
-        output_dir: Directory where to save the tonies.custom.json file (defaults to './output')
+        client (TeddyCloudClient): TeddyCloudClient instance to use for API communication
+        taf_file (str | None): Path to the TAF file to add
+        input_files (list[str] | None): List of input audio files used to create the TAF
+        artwork_url (str | None): URL of the uploaded artwork (if any)
+        output_dir (str | None): Directory where to save the tonies.custom.json file (defaults to './output')
         
     Returns:
-        True if successful, False otherwise
+        bool: True if successful, False otherwise
     """
     logger.trace("Entering fetch_and_update_tonies_json_v1 with client=%s, taf_file=%s, input_files=%s, artwork_url=%s, output_dir=%s",
                 client, taf_file, input_files, artwork_url, output_dir)
@@ -1275,14 +1279,14 @@ def fetch_and_update_tonies_json_v2(client: TeddyCloudClient, taf_file: Optional
     Fetch tonies.custom.json from server and merge with local file if it exists, then update with new entry.
     
     Args:
-        client: TeddyCloudClient instance to use for API communication
-        taf_file: Path to the TAF file to add
-        input_files: List of input audio files used to create the TAF
-        artwork_url: URL of the uploaded artwork (if any)
-        output_dir: Directory where to save the tonies.custom.json file (defaults to './output')
+        client (TeddyCloudClient): TeddyCloudClient instance to use for API communication
+        taf_file (str | None): Path to the TAF file to add
+        input_files (list[str] | None): List of input audio files used to create the TAF
+        artwork_url (str | None): URL of the uploaded artwork (if any)
+        output_dir (str | None): Directory where to save the tonies.custom.json file (defaults to './output')
         
     Returns:
-        True if successful, False otherwise
+        bool: True if successful, False otherwise
     """
     logger.trace("Entering fetch_and_update_tonies_json with client=%s, taf_file=%s, input_files=%s, artwork_url=%s, output_dir=%s",
                 client, taf_file, input_files, artwork_url, output_dir)

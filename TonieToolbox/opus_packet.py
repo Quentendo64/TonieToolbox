@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 Classes and functions for handling Opus audio packets
 """
@@ -6,8 +7,7 @@ import struct
 from .constants import SAMPLE_RATE_KHZ
 from .logger import get_logger
 
-# Setup logging
-logger = get_logger('opus_packet')
+logger = get_logger(__name__)
 
 
 class OpusPacket:
@@ -18,15 +18,15 @@ class OpusPacket:
     with particular focus on features needed for Tonie compatibility.
     """
     
-    def __init__(self, filehandle, size=-1, last_size=-1, dont_parse_info=False):
+    def __init__(self, filehandle, size: int = -1, last_size: int = -1, dont_parse_info: bool = False) -> None:
         """
         Initialize a new OpusPacket.
         
         Args:
             filehandle: File handle to read the packet data from, or None to create an empty packet
-            size: Size of the packet in bytes
-            last_size: Size of the previous packet in bytes
-            dont_parse_info: If True, don't parse the packet information even if this is a first packet
+            size (int): Size of the packet in bytes
+            last_size (int): Size of the previous packet in bytes
+            dont_parse_info (bool): If True, don't parse the packet information even if this is a first packet
         """
         self.config_value = None
         self.stereo = None
@@ -51,7 +51,7 @@ class OpusPacket:
         if self.first_packet and not dont_parse_info:
             self.parse_segment_info()
 
-    def get_frame_count(self):
+    def get_frame_count(self) -> int:
         """
         Get the number of frames in this packet based on its framepacking.
         
@@ -68,7 +68,7 @@ class OpusPacket:
             unpacked = struct.unpack("<B", self.data[1:2])
             return unpacked[0] & 63
 
-    def get_padding(self):
+    def get_padding(self) -> int:
         """
         Get the padding count for this packet.
         
@@ -94,7 +94,7 @@ class OpusPacket:
         logger.trace("Packet has %d bytes of padding", total_padding)
         return total_padding
 
-    def get_frame_size(self):
+    def get_frame_size(self) -> float:
         """
         Get the frame size in milliseconds based on the config value.
         
@@ -121,7 +121,7 @@ class OpusPacket:
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
-    def calc_granule(self):
+    def calc_granule(self) -> float:
         """
         Calculate the granule position for this packet.
         
@@ -133,7 +133,7 @@ class OpusPacket:
                    granule, self.frame_size, self.frame_count)
         return granule
 
-    def parse_segment_info(self):
+    def parse_segment_info(self) -> None:
         """Parse the segment information from the packet data."""
         logger.trace("Parsing segment info from packet data")
         byte = struct.unpack("<B", self.data[0:1])[0]
@@ -148,7 +148,7 @@ class OpusPacket:
         logger.trace("Packet info: config=%d, stereo=%d, framepacking=%d, frame_count=%d, frame_size=%f",
                    self.config_value, self.stereo, self.framepacking, self.frame_count, self.frame_size)
 
-    def write(self, filehandle):
+    def write(self, filehandle) -> None:
         """
         Write the packet data to a file.
         
@@ -159,7 +159,7 @@ class OpusPacket:
             logger.trace("Writing %d bytes of packet data to file", len(self.data))
             filehandle.write(self.data)
 
-    def convert_to_framepacking_three(self):
+    def convert_to_framepacking_three(self) -> None:
         """
         Convert the packet to use framepacking mode 3.
         
@@ -182,12 +182,12 @@ class OpusPacket:
         self.framepacking = 3
         logger.debug("Packet successfully converted to framepacking mode 3")
 
-    def set_pad_count(self, count):
+    def set_pad_count(self, count: int) -> None:
         """
         Set the padding count for this packet.
         
         Args:
-            count: Number of padding bytes to add
+            count (int): Number of padding bytes to add
             
         Raises:
             AssertionError: If the packet is not using framepacking mode 3 or is already padded

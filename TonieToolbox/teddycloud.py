@@ -9,8 +9,9 @@ import base64
 import ssl
 import socket
 import requests
+import json
 from .logger import get_logger
-logger = get_logger('teddycloud')
+logger = get_logger(__name__)
 DEFAULT_CONNECTION_TIMEOUT = 10
 DEFAULT_READ_TIMEOUT = 15  # seconds
 DEFAULT_MAX_RETRIES = 3
@@ -19,27 +20,33 @@ DEFAULT_RETRY_DELAY = 5  # seconds
 class TeddyCloudClient:
     """Client for interacting with TeddyCloud API."""
     
-    def __init__(self, base_url: str, ignore_ssl_verify: bool = False, 
-                 connection_timeout: int = DEFAULT_CONNECTION_TIMEOUT, 
-                 read_timeout: int = DEFAULT_READ_TIMEOUT, 
-                 max_retries: int = DEFAULT_MAX_RETRIES, 
-                 retry_delay: int = DEFAULT_RETRY_DELAY,
-                 username: str = None, password: str = None,
-                 cert_file: str = None, key_file: str = None):
+    def __init__(
+        self,
+        base_url: str,
+        ignore_ssl_verify: bool = False,
+        connection_timeout: int = DEFAULT_CONNECTION_TIMEOUT,
+        read_timeout: int = DEFAULT_READ_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_delay: int = DEFAULT_RETRY_DELAY,
+        username: str = None,
+        password: str = None,
+        cert_file: str = None,
+        key_file: str = None
+    ) -> None:
         """
         Initialize the TeddyCloud client.
         
         Args:
-            base_url: Base URL of the TeddyCloud instance (e.g., https://teddycloud.example.com)
-            ignore_ssl_verify: If True, SSL certificate verification will be disabled (useful for self-signed certificates)
-            connection_timeout: Timeout for establishing a connection
-            read_timeout: Timeout for reading data from the server
-            max_retries: Maximum number of retries for failed requests
-            retry_delay: Delay between retries
-            username: Username for basic authentication (optional)
-            password: Password for basic authentication (optional)
-            cert_file: Path to client certificate file for certificate-based authentication (optional)
-            key_file: Path to client private key file for certificate-based authentication (optional)
+            base_url (str): Base URL of the TeddyCloud instance (e.g., https://teddycloud.example.com)
+            ignore_ssl_verify (bool): If True, SSL certificate verification will be disabled (useful for self-signed certificates)
+            connection_timeout (int): Timeout for establishing a connection
+            read_timeout (int): Timeout for reading data from the server
+            max_retries (int): Maximum number of retries for failed requests
+            retry_delay (int): Delay between retries
+            username (str | None): Username for basic authentication (optional)
+            password (str | None): Password for basic authentication (optional)
+            cert_file (str | None): Path to client certificate file for certificate-based authentication (optional)
+            key_file (str | None): Path to client private key file for certificate-based authentication (optional)
         """
         self.base_url = base_url.rstrip('/')
         self.ignore_ssl_verify = ignore_ssl_verify
@@ -81,7 +88,7 @@ class TeddyCloudClient:
             except ssl.SSLError as e:
                 raise ValueError(f"Failed to load client certificate: {e}")
                 
-    def _create_request_kwargs(self):
+    def _create_request_kwargs(self) -> dict:
         """
         Create common request keyword arguments for all API calls.
         
@@ -98,18 +105,16 @@ class TeddyCloudClient:
             kwargs['cert'] = self.cert       
         return kwargs
     
-    def _make_request(self, method, endpoint, **kwargs):
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> 'requests.Response':
         """
         Make an HTTP request to the TeddyCloud API with retry logic.
         
         Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint (without base URL)
+            method (str): HTTP method (GET, POST, etc.)
+            endpoint (str): API endpoint (without base URL)
             **kwargs: Additional arguments to pass to requests
-            
         Returns:
             requests.Response: Response object
-            
         Raises:
             requests.exceptions.RequestException: If request fails after all retries
         """
@@ -171,7 +176,7 @@ class TeddyCloudClient:
 
     # ------------- GET API Methods -------------
     
-    def get_tonies_custom_json(self):
+    def get_tonies_custom_json(self) -> dict:
         """
         Get custom Tonies JSON data from the TeddyCloud server.
         
@@ -181,7 +186,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/toniesCustomJson')
         return response.json()
     
-    def get_tonies_json(self):
+    def get_tonies_json(self) -> dict:
         """
         Get Tonies JSON data from the TeddyCloud server.
         
@@ -191,7 +196,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/toniesJson')
         return response.json()
     
-    def get_tag_index(self):
+    def get_tag_index(self) -> dict:
         """
         Get tag index data from the TeddyCloud server.
         
@@ -201,7 +206,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/getTagIndex')
         return response.json()    
     
-    def get_file_index(self):
+    def get_file_index(self) -> dict:
         """
         Get file index data from the TeddyCloud server.
         
@@ -211,7 +216,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/fileIndex')
         return response.json()
     
-    def get_file_index_v2(self):
+    def get_file_index_v2(self) -> dict:
         """
         Get version 2 file index data from the TeddyCloud server.
         
@@ -221,7 +226,7 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/fileIndexV2')
         return response.json()
     
-    def get_tonieboxes_json(self):
+    def get_tonieboxes_json(self) -> dict:
         """
         Get Tonieboxes JSON data from the TeddyCloud server.
         
@@ -233,15 +238,14 @@ class TeddyCloudClient:
     
     # ------------- POST API Methods -------------
     
-    def create_directory(self, path, overlay=None, special=None):
+    def create_directory(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Create a directory on the TeddyCloud server.
         
         Args:
-            path: Directory path to create
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): Directory path to create
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -254,15 +258,14 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/dirCreate', params=params, data=path)
         return response.text
     
-    def delete_directory(self, path, overlay=None, special=None):
+    def delete_directory(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Delete a directory from the TeddyCloud server.
         
         Args:
-            path: Directory path to delete
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): Directory path to delete
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -275,15 +278,14 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/dirDelete', params=params, data=path)
         return response.text
     
-    def delete_file(self, path, overlay=None, special=None):
+    def delete_file(self, path: str, overlay: str = None, special: str = None) -> str:
         """
         Delete a file from the TeddyCloud server.
         
         Args:
-            path: File path to delete
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            path (str): File path to delete
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             str: Response message from server (usually "OK")
         """
@@ -296,16 +298,15 @@ class TeddyCloudClient:
         response = self._make_request('POST', '/api/fileDelete', params=params, data=path)
         return response.text
     
-    def upload_file(self, file_path, destination_path=None, overlay=None, special=None):
+    def upload_file(self, file_path: str, destination_path: str = None, overlay: str = None, special: str = None) -> dict:
         """
         Upload a file to the TeddyCloud server.
         
         Args:
-            file_path: Local path to the file to upload
-            destination_path: Server path where to write the file to (optional)
-            overlay: Settings overlay ID (optional)
-            special: Special folder source, only 'library' supported yet (optional)
-            
+            file_path (str): Local path to the file to upload
+            destination_path (str | None): Server path where to write the file to (optional)
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
         Returns:
             dict: JSON response from server
         """
@@ -334,3 +335,115 @@ class TeddyCloudClient:
             }
     
     # ------------- Custom API Methods -------------
+
+    def _get_paths_cache_file(self) -> str:
+        """
+        Get the path to the paths cache file.
+        
+        Returns:
+            str: Path to the paths cache file
+        """
+        cache_dir = os.path.join(os.path.expanduser("~"), ".tonietoolbox")
+        os.makedirs(cache_dir, exist_ok=True)
+        return os.path.join(cache_dir, "paths.json")
+    
+    def _load_paths_cache(self) -> set:
+        """
+        Load the paths cache from the cache file.
+        
+        Returns:
+            set: Set of existing directory paths
+        """
+        cache_file = self._get_paths_cache_file()
+        try:
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    paths_data = json.load(f)
+                    # Convert to set for faster lookups
+                    return set(paths_data.get('paths', []))
+            return set()
+        except Exception as e:
+            logger.warning(f"Failed to load paths cache: {e}")
+            return set()
+    
+    def _save_paths_cache(self, paths: set) -> None:
+        """
+        Save the paths cache to the cache file.
+        
+        Args:
+            paths (set): Set of directory paths to save
+        """
+        cache_file = self._get_paths_cache_file()
+        try:
+            paths_data = {'paths': list(paths)}
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(paths_data, f, indent=2)
+            logger.debug(f"Saved {len(paths)} paths to cache file")
+        except Exception as e:
+            logger.warning(f"Failed to save paths cache: {e}")
+    
+    def create_directories_recursive(self, path: str, overlay: str = None, special: str = "library") -> str:
+        """
+        Create directories recursively on the TeddyCloud server.
+
+        This function handles both cases:
+        - Directories that already exist (prevents 500 errors)
+        - Parent directories that don't exist yet (creates them first)
+        
+        This optimized version uses a local paths cache instead of querying the file index,
+        since the file index might not represent the correct folders.
+
+        Args:
+            path (str): Directory path to create (can contain multiple levels)
+            overlay (str | None): Settings overlay ID (optional)
+            special (str | None): Special folder source, only 'library' supported yet (optional)
+
+        Returns:
+            str: Response message from server
+        """
+        path = path.replace('\\', '/').strip('/')
+        if not path:
+            return "Path is empty"
+        existing_dirs = self._load_paths_cache()
+        logger.debug(f"Loaded {len(existing_dirs)} existing paths from cache")
+        path_components = path.split('/')
+        current_path = ""
+        result = "OK"
+        paths_updated = False
+        for component in path_components:
+            if current_path:
+                current_path += f"/{component}"
+            else:
+                current_path = component
+            if current_path in existing_dirs:
+                logger.debug(f"Directory '{current_path}' exists in paths cache, skipping creation")
+                continue
+
+            try:
+                result = self.create_directory(current_path, overlay, special)
+                logger.debug(f"Created directory: {current_path}")
+                # Add the newly created directory to our cache
+                existing_dirs.add(current_path)
+                paths_updated = True
+            except requests.exceptions.HTTPError as e:
+                # If it's a 500 error, likely the directory already exists
+                if e.response.status_code == 500:
+                    if "already exists" in e.response.text.lower():
+                        logger.debug(f"Directory '{current_path}' already exists, continuing")
+                        # Add to our cache for future operations
+                        existing_dirs.add(current_path)
+                        paths_updated = True
+                    else:
+                        # Log the actual error message but continue anyway
+                        # This allows us to continue even if the error is something else
+                        logger.warning(f"Warning while creating '{current_path}': {str(e)}")
+                else:
+                    # Re-raise for other HTTP errors
+                    logger.error(f"Failed to create directory '{current_path}': {str(e)}")
+                    raise
+        
+        # Save updated paths cache if any changes were made
+        if paths_updated:
+            self._save_paths_cache(existing_dirs)
+                
+        return result

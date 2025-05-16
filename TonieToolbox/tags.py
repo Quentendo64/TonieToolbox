@@ -8,17 +8,16 @@ from .teddycloud import TeddyCloudClient
 import json
 from typing import Optional, Union
 
-logger = get_logger('tags')
+logger = get_logger(__name__)
 
-def get_tags(client: TeddyCloudClient) -> bool:
+def get_tags(client: 'TeddyCloudClient') -> bool:
     """
     Get and display tags from a TeddyCloud instance.
     
     Args:
-        client: TeddyCloudClient instance to use for API communication
-        
+        client (TeddyCloudClient): TeddyCloudClient instance to use for API communication
     Returns:
-        True if tags were retrieved successfully, False otherwise
+        bool: True if tags were retrieved successfully, False otherwise
     """
     logger.info("Getting tags from TeddyCloud using provided client")
     

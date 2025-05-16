@@ -23,12 +23,25 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      prerelease: ${{ steps.check_prerelease.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Get version from tag
         id: get_version
         run: echo "version=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')" >> $GITHUB_OUTPUT
+      
+      - name: Check if prerelease version
+        id: check_prerelease
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Determine if this is a pre-release version according to PEP 440
+          if [[ "$VERSION" == *"a"* || "$VERSION" == *"b"* || "$VERSION" == *"rc"* ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          echo "Is prerelease: $(echo "$VERSION" | grep -E '([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z].*)' > /dev/null && echo 'true' || echo 'false')"
       
       - name: Extract release notes from CHANGELOG.md
         id: extract_notes
@@ -61,7 +74,7 @@ jobs:
         with:
           name: Release v${{ steps.get_version.outputs.version }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.check_prerelease.outputs.prerelease == 'true' }}
           body_path: release_notes.md
           generate_release_notes: false
 
@@ -92,13 +105,9 @@ jobs:
           exit 1
         fi
         sed -i "s/__version__ = .*/__version__ = '$VERSION'/" TonieToolbox/__init__.py
-        # Determine if this is a pre-release version
-        if [[ "$VERSION" == *"a"* || "$VERSION" == *"b"* || "$VERSION" == *"rc"* ]]; then
-          echo "PRERELEASE=true" >> $GITHUB_ENV
-        else
-          echo "PRERELEASE=false" >> $GITHUB_ENV
-        fi
-        echo "Using version: $VERSION from tag (prerelease: $PRERELEASE)"
+        # Use prerelease flag from create-release job
+        echo "PRERELEASE=${{ needs.create-release.outputs.prerelease }}" >> $GITHUB_ENV
+        echo "Using version: $VERSION from tag (prerelease: ${{ needs.create-release.outputs.prerelease }})"
     
     - name: Set version if provided
       if: github.event.inputs.version != ''
