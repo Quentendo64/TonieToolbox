@@ -180,20 +180,23 @@ class ToniesJsonHandlerv1:
         """
         logger.trace("Entering add_entry_from_taf() with taf_file=%s, input_files=%s, artwork_url=%s", 
                     taf_file, input_files, artwork_url)
-        
         if not self.is_loaded:
             logger.error("Cannot add entry: tonies.custom.json not loaded")
             return False
         
         try:
-            logger.info("Adding entry for %s to tonies.custom.json", taf_file)            
+            logger.info("Adding entry for %s to tonies.custom.json", taf_file)
             logger.debug("Extracting metadata from input files")
             metadata = self._extract_metadata_from_files(input_files)
             logger.debug("Extracted metadata: %s", metadata)
+            logger.debug("Extracting hash and timestamp from TAF file header")
+            from .tonie_analysis import get_header_info
             with open(taf_file, 'rb') as f:
-                taf_hash = hashlib.sha1(f.read()).hexdigest().upper()
-            
-            timestamp = str(int(time.time()))
+                header_size, tonie_header, file_size, audio_size, sha1, opus_head_found, \
+                opus_version, channel_count, sample_rate, bitstream_serial_no, opus_comments = get_header_info(f)                
+                taf_hash = tonie_header.dataHash.hex().upper()
+                timestamp = str(bitstream_serial_no)
+                logger.debug("Extracted hash: %s, timestamp: %s", taf_hash, timestamp)
             series = metadata.get('albumartist', metadata.get('artist', 'Unknown Artist'))
             episodes = metadata.get('album', os.path.splitext(os.path.basename(taf_file))[0])
             copyright = metadata.get('copyright', '')
@@ -829,15 +832,20 @@ class ToniesJsonHandlerv2:
         
         try:
             logger.info("Adding entry for %s to tonies.custom.json", taf_file)
-            
             logger.debug("Extracting metadata from input files")
             metadata = self._extract_metadata_from_files(input_files)
             logger.debug("Extracted metadata: %s", metadata)
+            
+            logger.debug("Extracting hash and timestamp from TAF file header")
+            from .tonie_analysis import get_header_info
             with open(taf_file, 'rb') as f:
-                taf_hash = hashlib.sha1(f.read()).hexdigest()
+                header_size, tonie_header, file_size, audio_size, sha1, opus_head_found, \
+                opus_version, channel_count, sample_rate, bitstream_serial_no, opus_comments = get_header_info(f)                
+                taf_hash = tonie_header.dataHash.hex().upper()
+                timestamp = bitstream_serial_no
+                logger.debug("Extracted hash: %s, timestamp: %s", taf_hash, timestamp)
             
             taf_size = os.path.getsize(taf_file)
-            timestamp = int(time.time())
             series = metadata.get('albumartist', metadata.get('artist', 'Unknown Artist'))
             episode = metadata.get('album', os.path.splitext(os.path.basename(taf_file))[0])
             track_desc = metadata.get('track_descriptions', [])
