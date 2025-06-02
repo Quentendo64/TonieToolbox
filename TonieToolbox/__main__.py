@@ -85,6 +85,8 @@ def main():
     parser.add_argument('-i', '--info', action='store_true', help='Check and display info about Tonie file')
     parser.add_argument('-s', '--split', action='store_true', help='Split Tonie file into opus tracks')
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
+    parser.add_argument('--files-to-taf', action='store_true', 
+                        help='Convert each audio file in a directory to individual .taf files')
     parser.add_argument('-O', '--output-to-source', action='store_true', 
                         help='Save output files in the source directory instead of output directory')
     parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
@@ -134,9 +136,7 @@ def main():
     log_level_group.add_argument('-Q', '--silent', action='store_true', help='Show only errors')
     log_group.add_argument('--log-file', action='store_true', default=False,
                        help='Save logs to a timestamped file in .tonietoolbox folder')
-    args = parser.parse_args()
-    
-    # ------------- Parser - Source Input -------------
+    args = parser.parse_args()    # ------------- Parser - Source Input -------------
     if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration or args.config_integration or args.auto_download):
         parser.error("the following arguments are required: SOURCE")
 
@@ -211,6 +211,147 @@ def main():
         logger.debug("Opening configuration file for editing")
         handle_config()
         sys.exit(0)
+        
+    # ------------- Files to TAF Processing -------------
+    if args.files_to_taf:
+        logger.info("Processing individual files to separate TAF files: %s", args.input_filename)
+        
+        if not os.path.isdir(args.input_filename):
+            logger.error("--files-to-taf requires a directory as input")
+            sys.exit(1)
+            
+        # Find all audio files in the directory (non-recursive)
+        audio_files = get_input_files(args.input_filename)
+        
+        if not audio_files:
+            logger.error("No audio files found in directory: %s", args.input_filename)
+            sys.exit(1)
+            
+        logger.info("Found %d audio files to convert", len(audio_files))
+        
+        output_dir = args.input_filename if args.output_to_source else './output'
+        
+        if not args.output_to_source and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            logger.debug("Created output directory: %s", output_dir)
+        
+        created_files = []
+        for file_index, audio_file in enumerate(audio_files):
+            # Generate output filename based on the original file
+            base_name = os.path.splitext(os.path.basename(audio_file))[0]
+            
+            # Apply media tag naming if requested
+            if args.use_media_tags:
+                tags = get_file_tags(audio_file)
+                if tags:
+                    template = args.name_template or "{artist} - {title}"
+                    new_name = format_metadata_filename(tags, template)
+                    if new_name:
+                        logger.debug("Using media tags for file naming: %s -> %s", base_name, new_name)
+                        base_name = new_name
+            
+            # Apply tonie tag if specified
+            if args.append_tonie_tag:
+                hex_tag = args.append_tonie_tag
+                if not all(c in '0123456789abcdefABCDEF' for c in hex_tag) or len(hex_tag) != 8:
+                    logger.error("TAG must be an 8-character hexadecimal value")
+                    sys.exit(1)
+                base_name = append_to_filename(base_name, hex_tag)
+            
+            output_filename = os.path.join(output_dir, f"{base_name}.taf")
+            
+            # Check if file already exists
+            skip_creation = False
+            if os.path.exists(output_filename):
+                logger.warning("Output file already exists: %s", output_filename)
+                valid_taf = check_tonie_file_cli(output_filename)
+                
+                if valid_taf and not args.force_creation:
+                    logger.warning("Valid Tonie file exists, skipping: %s", output_filename)
+                    skip_creation = True
+                else:
+                    logger.info("Output file exists but is not valid, proceeding to create new one")
+            
+            logger.info("[%d/%d] Converting: %s -> %s", 
+                      file_index + 1, len(audio_files), os.path.basename(audio_file), os.path.basename(output_filename))
+            
+            if not skip_creation:
+                try:
+                    create_tonie_file(output_filename, [audio_file], args.no_tonie_header, args.user_timestamp,
+                                   args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
+                                   args.auto_download, not args.use_legacy_tags, 
+                                   no_mono_conversion=args.no_mono_conversion)
+                    logger.info("Successfully created: %s", output_filename)
+                except Exception as e:
+                    logger.error("Failed to create %s: %s", output_filename, str(e))
+                    continue
+            
+            created_files.append(output_filename)
+            
+            # Handle upload if requested
+            if args.upload:
+                upload_path = args.path
+                if upload_path and '{' in upload_path and args.use_media_tags:
+                    metadata = get_file_tags(audio_file)
+                    if metadata:
+                        formatted_path = apply_template_to_path(upload_path, metadata)
+                        if formatted_path:
+                            logger.info("Using dynamic upload path from template: %s", formatted_path)
+                            upload_path = formatted_path
+                        else:
+                            logger.warning("Could not apply all tags to path template '%s'. Using as-is.", upload_path)
+                
+                # Create directories recursively if path is provided
+                if upload_path:
+                    logger.debug("Creating directory structure on server: %s", upload_path)
+                    try:
+                        client.create_directories_recursive(
+                            path=upload_path, 
+                            special=args.special_folder
+                        )
+                        logger.debug("Successfully created directory structure on server")
+                    except Exception as e:
+                        logger.warning("Failed to create directory structure on server: %s", str(e))
+                        logger.debug("Continuing with upload anyway, in case the directory already exists")
+                
+                response = client.upload_file(
+                    file_path=output_filename,
+                    destination_path=upload_path,                    
+                    special=args.special_folder,
+                )
+                upload_success = response.get('success', False)
+                
+                if not upload_success:
+                    logger.error("Failed to upload %s to TeddyCloud", output_filename)
+                else:
+                    logger.info("Successfully uploaded %s to TeddyCloud", output_filename)
+                    
+                # Handle artwork upload
+                artwork_url = None
+                if args.include_artwork:
+                    success, artwork_url = upload_artwork(client, output_filename, os.path.dirname(audio_file), [audio_file])
+                    if success:
+                        logger.info("Successfully uploaded artwork for %s", output_filename)
+                    else:
+                        logger.warning("Failed to upload artwork for %s", output_filename)
+                
+                # Handle custom JSON creation
+                if args.create_custom_json:
+                    json_output_dir = args.input_filename if args.output_to_source else output_dir
+                    client_param = client if 'client' in locals() else None
+                    if args.version_2:
+                        logger.debug("Using version 2 of the Tonies JSON format")
+                        success = fetch_and_update_tonies_json_v2(client_param, output_filename, [audio_file], artwork_url, json_output_dir)
+                    else:
+                        success = fetch_and_update_tonies_json_v1(client_param, output_filename, [audio_file], artwork_url, json_output_dir)
+                    if success:
+                        logger.info("Successfully updated Tonies JSON for %s", output_filename)
+                    else:
+                        logger.warning("Failed to update Tonies JSON for %s", output_filename)
+        
+        logger.info("Files to TAF processing completed. Created %d Tonie files.", len(created_files))
+        sys.exit(0)
+        
         # ------------- Normalize Path Input -------------
     if args.input_filename:
         logger.debug("Original input path: %s", args.input_filename)
@@ -600,7 +741,7 @@ def main():
                     out_filename = formatted_path
                 logger.info("Using template path for output: %s", out_filename)
             else:
-                logger.warning("Could not apply template to path. Using default output location.")
+                logger.warning("Could not apply template to path. Using default output handling.")
                 # Fall back to default output handling
                 if guessed_name:
                     logger.debug("Using guessed name for output: %s", guessed_name)
@@ -615,7 +756,7 @@ def main():
                         out_filename = os.path.join(output_dir, guessed_name)
                         logger.debug("Using default output location: %s", out_filename)
         else:
-            logger.warning("No metadata available to apply to template path. Using default output location.")
+            logger.warning("No metadata available to apply to template path. Using default output handling.")
             # Fall back to default output handling
     elif guessed_name:
         logger.debug("Using guessed name for output: %s", guessed_name)
