@@ -208,6 +208,83 @@ def get_opus_tempfile(
         return tmp_file, None
 
 
+def convert_opus_to_mp3(
+    opus_data: bytes,
+    output_path: str,
+    ffmpeg_binary: str = None,
+    bitrate: int = 128,
+    auto_download: bool = False
+) -> bool:
+    """
+    Convert Opus audio data to MP3 format using FFmpeg.
+    
+    Args:
+        opus_data (bytes): Raw Opus audio data (OGG container with Opus codec)
+        output_path (str): Path where to save the MP3 file
+        ffmpeg_binary (str | None): Path to the ffmpeg binary. If None, will be auto-detected or downloaded.
+        bitrate (int): Bitrate for the MP3 encoding in kbps
+        auto_download (bool): Whether to automatically download dependencies if not found
+    Returns:
+        bool: True if conversion was successful, False otherwise
+    """
+    logger.trace("Entering convert_opus_to_mp3(output_path=%s, bitrate=%d, auto_download=%s)",
+                output_path, bitrate, auto_download)
+    
+    logger.debug("Converting Opus data to MP3 format (bitrate: %d kbps)", bitrate)
+    
+    if ffmpeg_binary is None:
+        logger.debug("FFmpeg not specified, attempting to auto-detect")
+        ffmpeg_binary = get_ffmpeg_binary(auto_download)
+        if ffmpeg_binary is None:
+            logger.error("Could not find FFmpeg binary. Use --auto-download to enable automatic installation")
+            raise RuntimeError("Could not find FFmpeg binary. Use --auto-download to enable automatic installation")
+        logger.debug("Found FFmpeg at: %s", ffmpeg_binary)
+    
+    try:
+        logger.debug("Starting FFmpeg process for Opus to MP3 conversion")
+        ffmpeg_cmd = [
+            ffmpeg_binary, "-hide_banner", "-loglevel", "warning",
+            "-i", "-",  # Read from stdin
+            "-acodec", "libmp3lame",  # Use LAME MP3 encoder
+            "-b:a", f"{bitrate}k",  # Set bitrate
+            "-y",  # Overwrite output file
+            output_path
+        ]
+        logger.trace("FFmpeg command: %s", ffmpeg_cmd)
+        
+        ffmpeg_process = subprocess.Popen(
+            ffmpeg_cmd, 
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        # Write Opus data to FFmpeg stdin
+        stdout, stderr = ffmpeg_process.communicate(input=opus_data)
+        
+        logger.debug("FFmpeg process completed with return code: %d", ffmpeg_process.returncode)
+        
+        if ffmpeg_process.returncode != 0:
+            logger.error("FFmpeg conversion failed with return code %d", ffmpeg_process.returncode)
+            if stderr:
+                logger.error("FFmpeg error output: %s", stderr.decode('utf-8', errors='replace'))
+            return False
+        
+        # Verify the output file was created
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.debug("Successfully created MP3 file: %s (size: %d bytes)", 
+                        output_path, os.path.getsize(output_path))
+            logger.trace("Exiting convert_opus_to_mp3() with success")
+            return True
+        else:
+            logger.error("MP3 file was not created or is empty: %s", output_path)
+            return False
+            
+    except Exception as e:
+        logger.error("Error during Opus to MP3 conversion: %s", str(e))
+        return False
+
+
 def filter_directories(glob_list: list[str]) -> list[str]:
     """
     Filter a list of glob results to include only audio files that can be handled by ffmpeg.

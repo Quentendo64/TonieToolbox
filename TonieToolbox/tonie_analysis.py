@@ -5,8 +5,11 @@ Functions for analyzing Tonie files
 
 import datetime
 import hashlib
-import struct
+import math
 import os
+import re
+import struct
+import tempfile
 from  . import tonie_header_pb2
 from .ogg_page import OggPage
 from .logger import get_logger
@@ -56,6 +59,33 @@ def granule_to_time_string(granule: int, sample_rate: int = 1) -> str:
     seconds = int(total_seconds - (hours * 3600) - (minutes * 60))
     fraction = int((total_seconds * 100) % 100)
     return "{:02d}:{:02d}:{:02d}.{:02d}".format(hours, minutes, seconds, fraction)
+
+
+def extract_bitrate_from_encoder_options(opus_comments: dict) -> int:
+    """
+    Extract bitrate from Opus encoder_options comment.
+    
+    Args:
+        opus_comments (dict): Dictionary of Opus comments
+        
+    Returns:
+        int: Detected bitrate in kbps, or None if not found
+    """
+    if not opus_comments or "encoder_options" not in opus_comments:
+        return None
+    
+    encoder_options = opus_comments["encoder_options"]
+    logger.debug("Found encoder_options: %s", encoder_options)
+    
+    # Parse encoder options like: "--bitrate 96 --vbr" or "--bitrate=96"
+    bitrate_match = re.search(r'--bitrate[=\s]+(\d+)', encoder_options)
+    if bitrate_match:
+        bitrate = int(bitrate_match.group(1))
+        logger.debug("Detected source bitrate: %d kbps", bitrate)
+        return bitrate
+    
+    logger.debug("No bitrate found in encoder_options")
+    return None
 
 
 def get_header_info(in_file) -> tuple:
@@ -412,6 +442,210 @@ def split_to_opus_files(filename: str, output: str = None) -> None:
                             i + 1, page_count, granule)
         
         logger.info("Successfully split Tonie file into %d individual tracks", len(tonie_header.chapterPages))
+
+
+def extract_to_mp3_files(filename: str, output: str = None, bitrate: int = 128, ffmpeg_binary: str = None, auto_download: bool = False) -> None:
+    """
+    Extract a Tonie file to individual MP3 files.
+    
+    Args:
+        filename (str): Path to the Tonie file
+        output (str | None): Output directory path (optional)
+        bitrate (int): Bitrate for MP3 encoding in kbps
+        ffmpeg_binary (str | None): Path to ffmpeg binary
+        auto_download (bool): Whether to automatically download dependencies if not found
+    """
+    logger.info("Extracting Tonie file to individual MP3 tracks: %s", filename)
+    
+    with open(filename, "rb") as in_file:
+        # Get header info including Opus comments to detect source bitrate
+        header_size, tonie_header, file_size, audio_size, sha1sum, \
+        opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no, \
+        opus_comments = get_header_info(in_file)
+        
+        # Try to detect source bitrate from encoder options
+        detected_bitrate = extract_bitrate_from_encoder_options(opus_comments)
+        if detected_bitrate and bitrate == 128:  # Only use detected if bitrate wasn't explicitly set
+            bitrate = detected_bitrate
+            logger.info("Using detected source bitrate: %d kbps", bitrate)
+        elif detected_bitrate:
+            logger.info("Detected source bitrate: %d kbps, but using specified bitrate: %d kbps", 
+                       detected_bitrate, bitrate)
+        else:
+            logger.info("Using specified bitrate: %d kbps", bitrate)
+        
+        # Reset file position to start of audio data
+        in_file.seek(4 + header_size)
+
+        abs_path = os.path.abspath(filename)
+        if output:
+            if not os.path.exists(output):
+                logger.debug("Creating output directory: %s", output)
+                os.makedirs(output)
+            path = output
+        else:
+            path = os.path.dirname(abs_path)
+            
+        logger.debug("Output path: %s", path)
+        
+        name = os.path.basename(abs_path)
+        pos = name.rfind('.')
+        if pos == -1:
+            name = name + ".mp3"
+        else:
+            name = name[:pos] + ".mp3"
+            
+        filename_template = "{{:02d}}_{}".format(name)
+        out_path = "{}{}".format(path, os.path.sep)
+        logger.debug("Output filename template: %s", out_path + filename_template)
+
+        found = OggPage.seek_to_page_header(in_file)
+        if not found:
+            logger.error("First OGG page not found")
+            raise RuntimeError("First ogg page not found")
+            
+        first_page = OggPage(in_file)
+        logger.debug("Read first OGG page")
+
+        found = OggPage.seek_to_page_header(in_file)
+        if not found:
+            logger.error("Second OGG page not found")
+            raise RuntimeError("Second ogg page not found")
+            
+        second_page = OggPage(in_file)
+        logger.debug("Read second OGG page")
+        
+        found = OggPage.seek_to_page_header(in_file)
+        page = OggPage(in_file)
+        logger.debug("Read third OGG page")
+        
+        from .audio_conversion import convert_opus_to_mp3
+        
+        pad_len = math.ceil(math.log(len(tonie_header.chapterPages) + 1, 10))
+        format_string = "[{{:0{}d}}/{:0{}d}] {{}}".format(pad_len, len(tonie_header.chapterPages), pad_len)
+
+        for i in range(0, len(tonie_header.chapterPages)):
+            if (i + 1) < len(tonie_header.chapterPages):
+                end_page = tonie_header.chapterPages[i + 1]
+            else:
+                end_page = 0
+                
+            granule = 0
+            output_filename = filename_template.format(i + 1)
+            print(format_string.format(i + 1, output_filename))
+            logger.info("Creating track %d: %s (end page: %d)", i + 1, out_path + output_filename, end_page)
+            
+            # Create temporary Opus data in memory
+            with tempfile.NamedTemporaryFile() as temp_opus:
+                # Write Opus header pages and audio data
+                first_page.write_page(temp_opus)
+                second_page.write_page(temp_opus)
+                page_count = 0
+                
+                while found and ((page.page_no < end_page) or (end_page == 0)):
+                    page.correct_values(granule)
+                    granule = page.granule_position
+                    page.write_page(temp_opus)
+                    page_count += 1
+                    
+                    found = OggPage.seek_to_page_header(in_file)
+                    if found:
+                        page = OggPage(in_file)
+                
+                logger.debug("Track %d: Collected %d pages, final granule position: %d", 
+                            i + 1, page_count, granule)
+                
+                # Convert Opus data to MP3
+                temp_opus.seek(0)
+                opus_data = temp_opus.read()
+                mp3_output_path = "{}{}".format(out_path, output_filename)
+                
+                success = convert_opus_to_mp3(
+                    opus_data=opus_data,
+                    output_path=mp3_output_path,
+                    ffmpeg_binary=ffmpeg_binary,
+                    bitrate=bitrate,
+                    auto_download=auto_download
+                )
+                
+                if success:
+                    logger.debug("Successfully converted track %d to MP3", i + 1)
+                else:
+                    logger.error("Failed to convert track %d to MP3", i + 1)
+        
+        logger.info("Successfully extracted Tonie file to %d individual MP3 tracks", len(tonie_header.chapterPages))
+
+
+def extract_full_audio_to_mp3(filename: str, output_path: str = None, bitrate: int = 128, ffmpeg_binary: str = None, auto_download: bool = False) -> bool:
+    """
+    Extract the full audio content from a Tonie file to a single MP3 file.
+    
+    Args:
+        filename (str): Path to the Tonie file
+        output_path (str | None): Output MP3 file path (optional, will be generated if None)
+        bitrate (int): Bitrate for MP3 encoding in kbps
+        ffmpeg_binary (str | None): Path to ffmpeg binary
+        auto_download (bool): Whether to automatically download dependencies if not found    Returns:
+        bool: True if extraction was successful, False otherwise
+    """
+    logger.info("Extracting full audio from Tonie file to MP3: %s", filename)
+    
+    if output_path is None:
+        # Generate output path based on input filename
+        abs_path = os.path.abspath(filename)
+        name = os.path.basename(abs_path)
+        pos = name.rfind('.')
+        if pos == -1:
+            output_path = name + ".mp3"
+        else:
+            output_path = name[:pos] + ".mp3"
+        output_path = os.path.join(os.path.dirname(abs_path), output_path)
+    
+    logger.debug("Output MP3 file: %s", output_path)
+    
+    try:
+        with open(filename, "rb") as in_file:
+            # Get header info including Opus comments to detect source bitrate
+            header_size, tonie_header, file_size, audio_size, sha1sum, \
+            opus_head_found, opus_version, channel_count, sample_rate, bitstream_serial_no, \
+            opus_comments = get_header_info(in_file)
+            
+            # Try to detect source bitrate from encoder options
+            detected_bitrate = extract_bitrate_from_encoder_options(opus_comments)
+            if detected_bitrate and bitrate == 128:  # Only use detected if bitrate wasn't explicitly set
+                bitrate = detected_bitrate
+                logger.info("Using detected source bitrate: %d kbps", bitrate)
+            elif detected_bitrate:
+                logger.info("Detected source bitrate: %d kbps, but using specified bitrate: %d kbps", 
+                           detected_bitrate, bitrate)
+            else:
+                logger.info("Using specified bitrate: %d kbps", bitrate)
+            
+            # Reset file position to start of audio data and read all remaining Opus data
+            in_file.seek(4 + header_size)
+            opus_data = in_file.read()
+            logger.debug("Read %d bytes of Opus audio data", len(opus_data))
+            
+            from .audio_conversion import convert_opus_to_mp3
+            
+            success = convert_opus_to_mp3(
+                opus_data=opus_data,
+                output_path=output_path,
+                ffmpeg_binary=ffmpeg_binary,
+                bitrate=bitrate,
+                auto_download=auto_download
+            )
+            
+            if success:
+                logger.info("Successfully extracted full audio to MP3: %s", output_path)
+                return True
+            else:
+                logger.error("Failed to extract audio to MP3")
+                return False
+                
+    except Exception as e:
+        logger.error("Error extracting Tonie file to MP3: %s", str(e))
+        return False
 
 
 def compare_taf_files(file1: str, file2: str, detailed: bool = False) -> bool:

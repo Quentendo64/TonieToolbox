@@ -10,7 +10,7 @@ import logging
 from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
-from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files
+from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files, extract_to_mp3_files, extract_full_audio_to_mp3
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
@@ -76,11 +76,11 @@ def main():
     # ------------- Parser - Librarys -------------
     parser.add_argument('-f', '--ffmpeg', help='specify location of ffmpeg', default=None)
     parser.add_argument('-o', '--opusenc', help='specify location of opusenc', default=None)
-    parser.add_argument('-b', '--bitrate', type=int, help='set encoding bitrate in kbps (default: 96)', default=96)
+    parser.add_argument('-b', '--bitrate', type=int, help='set encoding bitrate in kbps for Opus & MP3 Conversion (default: 96)', default=96)
     parser.add_argument('-c', '--cbr', action='store_true', help='encode in cbr mode')
     parser.add_argument('--auto-download', action='store_true',
                         help='automatically download ffmpeg and opusenc if not found')
-    # ------------- Parser - TAF -------------
+    # ------------- Parser - TAF -------------    
     parser.add_argument('-a', '--append-tonie-tag', metavar='TAG', action='store',
                         help='append [TAG] to filename (must be an 8-character hex value)')
     parser.add_argument('-n', '--no-tonie-header', action='store_true', help='do not write Tonie header')
@@ -89,6 +89,8 @@ def main():
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
     parser.add_argument('--files-to-taf', action='store_true', 
                         help='Convert each audio file in a directory to individual .taf files')
+    parser.add_argument('--convert-to-separate-mp3', action='store_true', help='Convert Tonie file to individual MP3 tracks')
+    parser.add_argument('--convert-to-single-mp3', action='store_true', help='Convert Tonie file to a single MP3 file')
     parser.add_argument('-O', '--output-to-source', action='store_true', 
                         help='Save output files in the source directory instead of output directory')
     parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
@@ -653,11 +655,19 @@ def main():
         elif args.split:
             logger.info("Splitting Tonie file: %s", args.input_filename)
             split_to_opus_files(args.input_filename, args.output_filename)
-            sys.exit(0)
+            sys.exit(0)        
         elif args.compare:
             logger.info("Comparing Tonie files: %s and %s", args.input_filename, args.compare)
             result = compare_taf_files(args.input_filename, args.compare, args.detailed_compare)
             sys.exit(0 if result else 1)
+        elif args.convert_to_separate_mp3:
+            logger.info("Converting Tonie file to separate MP3 tracks: %s", args.input_filename)
+            extract_to_mp3_files(args.input_filename, args.output_filename, args.bitrate)
+            sys.exit(0)
+        elif args.convert_to_single_mp3:
+            logger.info("Converting Tonie file to single MP3: %s", args.input_filename)
+            extract_full_audio_to_mp3(args.input_filename, args.output_filename, args.bitrate)
+            sys.exit(0)
 
     files = get_input_files(args.input_filename)
     logger.debug("Found %d files to process", len(files))
