@@ -15,13 +15,15 @@ from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_depen
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
 from .version_handler import check_for_updates, clear_version_cache
-from .recursive_processor import process_recursive_folders
+from .recursive_processor import process_recursive_folders, find_audio_folders, get_all_audio_files_recursive
 from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
 from .integration import handle_integration, handle_config
+
+
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -178,17 +180,25 @@ def main():
             logger.info("Update available but user chose to continue without updating.")
 
     # ------------- Autodownload & Dependency Checks -------------
-    if args.auto_download:
-        logger.debug("Auto-download requested for ffmpeg and opusenc")
-        ffmpeg_binary = get_ffmpeg_binary(auto_download=True)
-        opus_binary = get_opus_binary(auto_download=True)
-        if ffmpeg_binary and opus_binary:
-            logger.info("FFmpeg and opusenc downloaded successfully.")
-            if args.input_filename is None:
-                sys.exit(0)
-        else:
-            logger.error("Failed to download ffmpeg or opusenc. Please install them manually.")
+        # ------------- Librarys / Prereqs -------------
+    logger.debug("Checking for external dependencies")
+    ffmpeg_binary = args.ffmpeg
+    if ffmpeg_binary is None:
+        logger.debug("No FFmpeg specified, attempting to locate binary (auto_download=%s)", args.auto_download)
+        ffmpeg_binary = get_ffmpeg_binary(args.auto_download)
+        if ffmpeg_binary is None:
+            logger.error("Could not find FFmpeg. Please install FFmpeg or specify its location using --ffmpeg or use --auto-download")
             sys.exit(1)
+        logger.debug("Using FFmpeg binary: %s", ffmpeg_binary)
+
+    opus_binary = args.opusenc
+    if opus_binary is None:
+        logger.debug("No opusenc specified, attempting to locate binary (auto_download=%s)", args.auto_download)
+        opus_binary = get_opus_binary(args.auto_download) 
+        if opus_binary is None:
+            logger.error("Could not find opusenc. Please install opus-tools or specify its location using --opusenc or use --auto-download")
+            sys.exit(1)
+        logger.debug("Using opusenc binary: %s", opus_binary)
 
     # ------------- Context Menu Integration -------------
     if args.install_integration or args.uninstall_integration:
@@ -207,24 +217,31 @@ def main():
         else:
             logger.error("FFmpeg and opusenc are required for context menu integration")
             sys.exit(1)    
+
     if args.config_integration:
         logger.debug("Opening configuration file for editing")
         handle_config()
         sys.exit(0)
-        
-    # ------------- Files to TAF Processing -------------
+          # ------------- Files to TAF Processing -------------
     if args.files_to_taf:
-        logger.info("Processing individual files to separate TAF files: %s", args.input_filename)
+        if args.recursive:
+            logger.info("Processing individual files to separate TAF files recursively: %s", args.input_filename)
+        else:
+            logger.info("Processing individual files to separate TAF files: %s", args.input_filename)
         
         if not os.path.isdir(args.input_filename):
             logger.error("--files-to-taf requires a directory as input")
             sys.exit(1)
-            
-        # Find all audio files in the directory (non-recursive)
-        audio_files = get_input_files(args.input_filename)
+        
+        # Use recursive file discovery if --recursive flag is also specified
+        if args.recursive:
+            audio_files = get_all_audio_files_recursive(args.input_filename)
+        else:
+            audio_files = get_input_files(args.input_filename)
         
         if not audio_files:
-            logger.error("No audio files found in directory: %s", args.input_filename)
+            search_type = "recursively" if args.recursive else "in directory"
+            logger.error("No audio files found %s: %s", search_type, args.input_filename)
             sys.exit(1)
             
         logger.info("Found %d audio files to convert", len(audio_files))
