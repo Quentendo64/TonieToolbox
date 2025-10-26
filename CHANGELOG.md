@@ -6,9 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+### Fixed
+### Changed
+### Removed
+
+## [0.6.5] - 2025-10-25
+### Added
+- Implemented minimal GUI player using tkinter with --play-ui option
+- Added Tools tab to GUI player for audio file conversion
+- Added docker multiarchitecture build (amd64, arm64)
+- Multi-platform python builds for Windows (x64), Linux (x64, arm64), MacOS (x64, arm64)
+### Fixed
+- Fixed FFmpeg output path handling for conversion functions
+### Changed
+- Improved Tools tab to automatically synchronize with Player tab when a file is loaded
+- kde integration updated to use --play-ui for GUI player
+- Bump protobuf dependency to <=6.33.0 and requests to >=2.32.5
+- Updated protobuf generated code to match new dependency version
+### Removed
+- Support/Automatic testing for Python <=3.12
+
+## [0.6.4] - 2025-10-25
+### Added
 - Added simple .taf player using --play
-- Fixed certificate path issue on Windows-Integration for TeddyCloud upload
 - Added initial KDE integration for context menu handling
+### Fixed
+- Fixed certificate path issue on Windows-Integration for TeddyCloud upload
+### Changed
 - Adjusted --show-tags to return all available tags (excluding artwork/picture tags)
 
 ## [0.6.1] - 2025-05-24

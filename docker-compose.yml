@@ -1,6 +1,10 @@
 services:
   tonietoolbox:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+        - linux/arm64
     image: tonietoolbox
     volumes:
       # Mount the input directory

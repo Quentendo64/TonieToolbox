@@ -1,0 +1,223 @@
+name: Build Matrix Testing
+
+on:
+  push:
+    branches: [ main, Develop ]
+  pull_request:
+    branches: [ main, Develop ]
+  workflow_dispatch:
+    inputs:
+      debug_tests:
+        description: 'Enable debug output for tests'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  DEBUG_TESTS: ${{ inputs.debug_tests || false }}
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12','3.13','3.14']
+        architecture: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            architecture: arm64
+          - os: ubuntu-latest
+            architecture: arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~\AppData\Local\pip\Cache
+          ~/Library/Caches/pip
+        key: ${{ runner.os }}-${{ matrix.architecture }}-pip-py${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml', '**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.architecture }}-pip-py${{ matrix.python-version }}-
+          ${{ runner.os }}-${{ matrix.architecture }}-pip-
+          ${{ runner.os }}-pip-
+
+    - name: Cache system packages (Linux)
+      if: runner.os == 'Linux'
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt
+        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build-matrix.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
+    - name: Cache Homebrew (macOS)
+      if: runner.os == 'macOS'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/Library/Caches/Homebrew
+          /usr/local/Homebrew
+        key: ${{ runner.os }}-homebrew-${{ hashFiles('.github/workflows/build-matrix.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-homebrew-
+
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends ffmpeg opus-tools
+
+    - name: Install system dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        export HOMEBREW_NO_INSTALL_CLEANUP=1
+        brew install ffmpeg opus-tools
+
+    - name: Install system dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install ffmpeg opus-tools
+
+    - name: Cache Python wheels
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip/wheels
+          ~\AppData\Local\pip\Cache\wheels
+          ~/Library/Caches/pip/wheels
+        key: ${{ runner.os }}-${{ matrix.architecture }}-wheels-py${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml', '**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.architecture }}-wheels-py${{ matrix.python-version }}-
+          ${{ runner.os }}-${{ matrix.architecture }}-wheels-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install build
+
+    - name: Test package installation
+      run: |
+        # Test that the package can be installed and imported
+        pip install .
+        python -c "import TonieToolbox; print('Package imported successfully')"
+        tonietoolbox --version || echo "CLI command test failed"
+
+    - name: Test tonietoolbox conversion (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        DEBUG_FLAG=""
+        if [[ "${{ env.DEBUG_TESTS }}" == "true" ]]; then
+          DEBUG_FLAG="--debug"
+        fi
+
+        if ! tonietoolbox ./tests/data/test_audio.mp3 $DEBUG_FLAG; then
+          echo "MP3 conversion command test failed"
+          exit 1
+        fi
+
+    - name: Test tonietoolbox taf analysis (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        DEBUG_FLAG=""
+        if [[ "${{ env.DEBUG_TESTS }}" == "true" ]]; then
+          DEBUG_FLAG="--debug"
+        fi
+        
+        if ! tonietoolbox ./output/test_audio.taf --info $DEBUG_FLAG; then
+          echo "TAF Info command test failed"
+          exit 1
+        fi
+
+    - name: Test tonietoolbox conversion (Windows)
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: |
+        $DEBUG_FLAG = ""
+        if ("${{ env.DEBUG_TESTS }}" -eq "true") {
+          $DEBUG_FLAG = "--debug"
+        }
+        
+        try {
+          tonietoolbox ./tests/data/test_audio.mp3 $DEBUG_FLAG
+          if ($LASTEXITCODE -ne 0) { throw "MP3 conversion command test failed" }
+        } catch {
+          Write-Error "MP3 conversion command test failed"
+          exit 1
+        }        
+
+    - name: Test tonietoolbox taf analysis (Windows)
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: |
+        $DEBUG_FLAG = ""
+        if ("${{ env.DEBUG_TESTS }}" -eq "true") {
+          $DEBUG_FLAG = "--debug"
+        }
+        
+        try {
+          tonietoolbox --info ./output/test_audio.taf $DEBUG_FLAG
+          if ($LASTEXITCODE -ne 0) { throw "TAF Info command test failed" }
+        } catch {
+          Write-Error "TAF Info command test failed"
+          exit 1
+        }
+
+    - name: Cache built distributions
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: ${{ runner.os }}-${{ matrix.architecture }}-dist-py${{ matrix.python-version }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.architecture }}-dist-py${{ matrix.python-version }}-
+
+    - name: Build package
+      run: |
+        python -m build
+        
+    - name: Check built package
+      run: |
+        pip install twine
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.14'
+      with:
+        name: dist-packages
+        path: dist/
+        retention-days: 30
+
+  build-summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Build Summary
+      shell: bash
+      run: |
+        echo "Build matrix completed"
+        echo "Test job status: ${{ needs.test.result }}"
+        if [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "Some tests failed in the build matrix"
+          exit 1
+        fi
