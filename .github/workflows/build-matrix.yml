@@ -6,9 +6,18 @@ on:
   pull_request:
     branches: [ main, Develop ]
   workflow_dispatch:
+    inputs:
+      debug_tests:
+        description: 'Enable debug output for tests'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+
+env:
+  DEBUG_TESTS: ${{ inputs.debug_tests || false }}
 
 jobs:
   test:
@@ -18,7 +27,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.14']
-        architecture: [arm64]
+        architecture: [amd64, arm64]
         exclude:
           - os: windows-latest
             architecture: arm64
@@ -74,11 +83,16 @@ jobs:
 
     - name: Test tonietoolbox functionality
       run: |
-        if ! tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 --debug; then
+        DEBUG_FLAG=""
+        if [[ "${{ env.DEBUG_TESTS }}" == "true" ]]; then
+          DEBUG_FLAG="--debug"
+        fi
+        
+        if ! tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 $DEBUG_FLAG; then
           echo "Conversion command test failed"
           exit 1
         fi
-        if ! tonietoolbox --info ./output/test_audio.taf; then
+        if ! tonietoolbox --info ./output/test_audio.taf $DEBUG_FLAG; then
           echo "TAF Info command test failed"
           exit 1
         fi
