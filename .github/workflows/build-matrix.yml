@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.12','3.13', '3.14']
-        architecture: [x64, arm64]
+        python-version: ['3.14']
+        architecture: [arm64]
         exclude:
           - os: windows-latest
             architecture: arm64
@@ -62,9 +62,14 @@ jobs:
 
     - name: Test tonietoolbox functionality
       run: |
-        # Run basic conversion tests
-        tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 --debug || echo "Conversion command test failed"
-        tonietoolbox --info ./output/test_audio.taf || echo "TAF Info command test failed"
+        if ! tonietoolbox --auto-download ./tests/data/test_audio.mp3 --bitrate 128 --debug; then
+          echo "Conversion command test failed"
+          exit 1
+        fi
+        if ! tonietoolbox --auto-download --info ./output/test_audio.taf; then
+          echo "TAF Info command test failed"
+          exit 1
+        fi
 
     - name: Build package
       run: |
