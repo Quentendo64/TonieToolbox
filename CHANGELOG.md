@@ -7,17 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Multi-platform builds for Windows (x64), Linux (x64, arm64), MacOS (x64, arm64)
 ### Fixed
 ### Changed
 ### Removed
-- Support/Automatic testing for Python <=3.12
 
 ## [0.6.5] - 2025-10-25
 ### Added
 - Implemented minimal GUI player using tkinter with --play-ui option
 - Added Tools tab to GUI player for audio file conversion
 - Added docker multiarchitecture build (amd64, arm64)
+- Multi-platform python builds for Windows (x64), Linux (x64, arm64), MacOS (x64, arm64)
 ### Fixed
 - Fixed FFmpeg output path handling for conversion functions
 ### Changed
@@ -26,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump protobuf dependency to <=6.33.0 and requests to >=2.32.5
 - Updated protobuf generated code to match new dependency version
 ### Removed
+- Support/Automatic testing for Python <=3.12
 
 ## [0.6.4] - 2025-10-25
 ### Added
