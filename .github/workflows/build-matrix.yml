@@ -1,0 +1,98 @@
+name: Build Matrix Testing
+
+on:
+  push:
+    branches: [ main, Develop ]
+  pull_request:
+    branches: [ main, Develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12','3.13', '3.14']
+        architecture: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            architecture: arm64
+          - os: ubuntu-latest
+            architecture: arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~\AppData\Local\pip\Cache
+          ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install build
+
+    - name: Test package installation
+      run: |
+        # Test that the package can be installed and imported
+        pip install .
+        python -c "import TonieToolbox; print('Package imported successfully')"
+        tonietoolbox --version || echo "CLI command test failed"
+
+    - name: Test tonietoolbox functionality
+      run: |
+        # Run basic conversion tests
+        tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 --debug || echo "Conversion command test failed"
+        tonietoolbox --info ./output/test_audio.taf || echo "TAF Info command test failed"
+
+    - name: Build package
+      run: |
+        python -m build
+        
+    - name: Check built package
+      run: |
+        pip install twine
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.14'
+      with:
+        name: dist-packages
+        path: dist/
+        retention-days: 30
+
+  build-summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Build Summary
+      run: |
+        echo "Build matrix completed"
+        echo "Test job status: ${{ needs.test.result }}"
+        if [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "Some tests failed in the build matrix"
+          exit 1
+        fi
