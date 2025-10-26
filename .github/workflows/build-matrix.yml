@@ -47,6 +47,18 @@ jobs:
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
           ${{ runner.os }}-pip-
 
+    - name: Install system dependencies
+      run: |
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg opus-tools
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          brew install ffmpeg opus-tools
+        elif [[ "${{ runner.os }}" == "Windows" ]]; then
+          choco install ffmpeg
+          # Note: opusenc is typically included with ffmpeg on Windows
+        fi
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -62,11 +74,11 @@ jobs:
 
     - name: Test tonietoolbox functionality
       run: |
-        if ! tonietoolbox --auto-download ./tests/data/test_audio.mp3 --bitrate 128 --debug; then
+        if ! tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 --debug; then
           echo "Conversion command test failed"
           exit 1
         fi
-        if ! tonietoolbox --auto-download --info ./output/test_audio.taf; then
+        if ! tonietoolbox --info ./output/test_audio.taf; then
           echo "TAF Info command test failed"
           exit 1
         fi
