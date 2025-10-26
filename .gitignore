@@ -19,6 +19,9 @@ ENV/
 .coverage
 htmlcov/
 test*.py
+test*.sh
+test*.ps1
+test*.cmd
 *.bak
 
 # Development environment files

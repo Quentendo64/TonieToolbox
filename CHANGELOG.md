@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Fixed
+### Changed
+### Removed
+
+## [0.6.5] - 2025-10-25
+### Added
 - Implemented minimal GUI player using tkinter with --play-ui option
 - Added Tools tab to GUI player for audio file conversion
+- Added docker multiarchitecture build (amd64, arm64)
 ### Fixed
 - Fixed FFmpeg output path handling for conversion functions
 ### Changed
