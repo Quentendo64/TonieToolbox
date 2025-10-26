@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved Tools tab to automatically synchronize with Player tab when a file is loaded
 - kde integration updated to use --play-ui for GUI player
+- Bump protobuf dependency to <=6.33.0 and requests to >=2.32.5
+- Updated protobuf generated code to match new dependency version
 ### Removed
 
 ## [0.6.4] - 2025-10-25

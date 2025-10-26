@@ -40,8 +40,8 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "protobuf<=3.19.0",
-        "requests>=2.32.3",
+        "protobuf<=6.33.0",
+        "requests>=2.32.5",
         "mutagen>=1.47.0",
         "packaging>=25.0",
         "tqdm>=4.67.1"
