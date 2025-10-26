@@ -11,6 +11,7 @@ from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
 from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files, extract_to_mp3_files, extract_full_audio_to_mp3
+from .player import interactive_player
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
@@ -36,6 +37,8 @@ def main():
                        help='Upload to TeddyCloud instance (e.g., https://teddycloud.example.com). Supports .taf, .jpg, .jpeg, .png files.')
     teddycloud_group.add_argument('--include-artwork', action='store_true',
                        help='Upload cover artwork image alongside the Tonie file when using --upload')
+    teddycloud_group.add_argument('--assign-to-tag', action='store_true',
+                       help='Assign the uploaded file to a specific tag ID')
     teddycloud_group.add_argument('--get-tags', action='store', metavar='URL',
                        help='Get available tags from TeddyCloud instance')
     teddycloud_group.add_argument('--ignore-ssl-verify', action='store_true',
@@ -85,6 +88,8 @@ def main():
                         help='append [TAG] to filename (must be an 8-character hex value)')
     parser.add_argument('-n', '--no-tonie-header', action='store_true', help='do not write Tonie header')
     parser.add_argument('-i', '--info', action='store_true', help='Check and display info about Tonie file')
+    parser.add_argument('-p', '--play', action='store_true', help='Play TAF audio file with interactive controls')
+    parser.add_argument('--play-ui', action='store_true', help='Play TAF audio file with user interface (future implementation)')
     parser.add_argument('-s', '--split', action='store_true', help='Split Tonie file into opus tracks')
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
     parser.add_argument('--files-to-taf', action='store_true', 
@@ -344,7 +349,7 @@ def main():
                     logger.error("Failed to upload %s to TeddyCloud", output_filename)
                 else:
                     logger.info("Successfully uploaded %s to TeddyCloud", output_filename)
-                    
+                
                 # Handle artwork upload
                 artwork_url = None
                 if args.include_artwork:
@@ -483,6 +488,21 @@ def main():
                 logger.info("Successfully uploaded %s to TeddyCloud", file_path)
                 logger.debug("Upload response details: %s", 
                           {k: v for k, v in response.items() if k != 'success'})
+                if args.assign_to_tag:
+                    tag_id = input("Enter the tag ID to assign the uploaded file: eg. 'E0:04:03:50:11:AA:7E:81': ").strip()
+                    fileName = os.path.basename(file_path)
+                    if upload_path:
+                        libPath = f"lib://{upload_path}/{fileName}"
+                    else:
+                        libPath = f"lib://{fileName}"
+                    logger.info("Assigning uploaded file %s to tag ID: %s", fileName, tag_id)
+                    logger.debug("Library path for assignment: %s", libPath)
+                    success = client.assign_tag_path(libPath, tag_id)
+                    if success:
+                        logger.info("Successfully assigned tag %s to %s", tag_id, fileName)
+                    else:
+                        logger.warning("Failed to assign tag %s to %s", tag_id, fileName)
+
             artwork_url = None
             if args.include_artwork and file_path.lower().endswith('.taf'):
                 source_dir = os.path.dirname(file_path)
@@ -655,11 +675,20 @@ def main():
         elif args.split:
             logger.info("Splitting Tonie file: %s", args.input_filename)
             split_to_opus_files(args.input_filename, args.output_filename)
-            sys.exit(0)        
+            sys.exit(0)
         elif args.compare:
             logger.info("Comparing Tonie files: %s and %s", args.input_filename, args.compare)
             result = compare_taf_files(args.input_filename, args.compare, args.detailed_compare)
             sys.exit(0 if result else 1)
+        elif args.play:
+            logger.info("Playing Tonie file: %s", args.input_filename)
+            interactive_player(args.input_filename)
+            sys.exit(0)        
+        elif args.play_ui:
+            logger.warning("Nothing to see here yet!")
+            logger.info("This is for future implementation of a minimal GUI player.")
+            logger.info("Playing Tonie file with user interface: %s", args.input_filename)
+            sys.exit(0)
         elif args.convert_to_separate_mp3:
             logger.info("Converting Tonie file to separate MP3 tracks: %s", args.input_filename)
             extract_to_mp3_files(args.input_filename, args.output_filename, args.bitrate)
