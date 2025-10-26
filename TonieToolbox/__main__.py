@@ -12,6 +12,7 @@ from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
 from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files, extract_to_mp3_files, extract_full_audio_to_mp3
 from .player import interactive_player
+from .player_gui import gui_player
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
@@ -89,7 +90,7 @@ def main():
     parser.add_argument('-n', '--no-tonie-header', action='store_true', help='do not write Tonie header')
     parser.add_argument('-i', '--info', action='store_true', help='Check and display info about Tonie file')
     parser.add_argument('-p', '--play', action='store_true', help='Play TAF audio file with interactive controls')
-    parser.add_argument('--play-ui', action='store_true', help='Play TAF audio file with user interface (future implementation)')
+    parser.add_argument('--play-ui', action='store_true', help='Play TAF audio file with minimal GUI interface (requires tkinter)')
     parser.add_argument('-s', '--split', action='store_true', help='Split Tonie file into opus tracks')
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
     parser.add_argument('--files-to-taf', action='store_true', 
@@ -685,9 +686,8 @@ def main():
             interactive_player(args.input_filename)
             sys.exit(0)        
         elif args.play_ui:
-            logger.warning("Nothing to see here yet!")
-            logger.info("This is for future implementation of a minimal GUI player.")
-            logger.info("Playing Tonie file with user interface: %s", args.input_filename)
+            logger.info("Starting GUI player for Tonie file: %s", args.input_filename)
+            gui_player(args.input_filename)
             sys.exit(0)
         elif args.convert_to_separate_mp3:
             logger.info("Converting Tonie file to separate MP3 tracks: %s", args.input_filename)

@@ -6,9 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Implemented minimal GUI player using tkinter with --play-ui option
+- Added Tools tab to GUI player for audio file conversion
+### Fixed
+- Fixed FFmpeg output path handling for conversion functions
+### Changed
+- Improved Tools tab to automatically synchronize with Player tab when a file is loaded
+- kde integration updated to use --play-ui for GUI player
+### Removed
+
+## [0.6.4] - 2025-10-25
+### Added
 - Added simple .taf player using --play
-- Fixed certificate path issue on Windows-Integration for TeddyCloud upload
 - Added initial KDE integration for context menu handling
+### Fixed
+- Fixed certificate path issue on Windows-Integration for TeddyCloud upload
+### Changed
 - Adjusted --show-tags to return all available tags (excluding artwork/picture tags)
 
 ## [0.6.1] - 2025-05-24

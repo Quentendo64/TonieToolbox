@@ -89,7 +89,7 @@ class KDEServiceMenuIntegration:
         if use_info:
             tonietoolbox_cmd += ' --info'
         if use_play:
-            tonietoolbox_cmd += ' --play'
+            tonietoolbox_cmd += ' --play-ui'
         if is_split:
             tonietoolbox_cmd += ' --split'
         if use_compare:
@@ -471,7 +471,7 @@ Comment=Play Tonie audio files with TonieToolbox
 Comment[de]=Tonie-Audiodateien mit TonieToolbox abspielen
 GenericName=Tonie Audio Player
 GenericName[de]=Tonie Audio Player
-Exec=konsole -e {self.play_cmd} %f
+Exec={self.play_cmd} %f
 Icon={self.icon_path}
 Terminal=false
 NoDisplay=true
