@@ -17,7 +17,7 @@ from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
 from .version_handler import check_for_updates, clear_version_cache
 from .recursive_processor import process_recursive_folders, find_audio_folders, get_all_audio_files_recursive
-from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
+from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags, get_all_file_tags
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
@@ -423,7 +423,7 @@ def main():
             logger.error("No files found for pattern %s", args.input_filename)
             sys.exit(1)
         for file_index, file_path in enumerate(files):
-            tags = get_file_tags(file_path)
+            tags = get_all_file_tags(file_path)
             if tags:
                 print(f"\nFile {file_index + 1}: {os.path.basename(file_path)}")
                 print("-" * 40)
