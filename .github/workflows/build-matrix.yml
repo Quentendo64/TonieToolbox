@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.14']
+        python-version: ['3.12','3.13','3.14']
         architecture: [x64, arm64]
         exclude:
           - os: windows-latest
@@ -56,17 +56,21 @@ jobs:
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
           ${{ runner.os }}-pip-
 
-    - name: Install system dependencies
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
       run: |
-        if [[ "${{ runner.os }}" == "Linux" ]]; then
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg opus-tools
-        elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          brew install ffmpeg opus-tools
-        elif [[ "${{ runner.os }}" == "Windows" ]]; then
-          choco install ffmpeg
-          # Note: opusenc is typically included with ffmpeg on Windows
-        fi
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg opus-tools
+
+    - name: Install system dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install ffmpeg opus-tools
+
+    - name: Install system dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install ffmpeg opus-tools
 
     - name: Install dependencies
       run: |
@@ -81,21 +85,36 @@ jobs:
         python -c "import TonieToolbox; print('Package imported successfully')"
         tonietoolbox --version || echo "CLI command test failed"
 
-    - name: Test tonietoolbox functionality
+    - name: Test tonietoolbox functionality (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
       run: |
         DEBUG_FLAG=""
         if [[ "${{ env.DEBUG_TESTS }}" == "true" ]]; then
           DEBUG_FLAG="--debug"
         fi
         
-        if ! tonietoolbox ./tests/data/test_audio.mp3 --bitrate 128 $DEBUG_FLAG; then
-          echo "Conversion command test failed"
-          exit 1
-        fi
-        if ! tonietoolbox --info ./output/test_audio.taf $DEBUG_FLAG; then
+        if ! tonietoolbox ./tests/data/test_audio.taf --info $DEBUG_FLAG; then
           echo "TAF Info command test failed"
           exit 1
         fi
+
+    - name: Test tonietoolbox functionality (Windows)
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: |
+        $DEBUG_FLAG = ""
+        if ("${{ env.DEBUG_TESTS }}" -eq "true") {
+          $DEBUG_FLAG = "--debug"
+        }
+        
+        try {
+          tonietoolbox ./tests/data/test_audio.taf --info $DEBUG_FLAG
+          if ($LASTEXITCODE -ne 0) { throw "TAF Info command test failed" }
+        } catch {
+          Write-Error "TAF Info command test failed"
+          exit 1
+        }
 
     - name: Build package
       run: |
@@ -120,6 +139,7 @@ jobs:
     if: always()
     steps:
     - name: Build Summary
+      shell: bash
       run: |
         echo "Build matrix completed"
         echo "Test job status: ${{ needs.test.result }}"

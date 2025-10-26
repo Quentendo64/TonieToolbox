@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Multi-platform builds for Windows (x64), Linux (x64, arm64), MacOS (x64, arm64)
 ### Fixed
 ### Changed
 ### Removed
+- Support/Automatic testing for Python <=3.12
 
 ## [0.6.5] - 2025-10-25
 ### Added
