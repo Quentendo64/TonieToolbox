@@ -10,18 +10,21 @@ import logging
 from . import __version__
 from .audio_conversion import get_input_files, append_to_filename
 from .tonie_file import create_tonie_file
-from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files
+from .tonie_analysis import check_tonie_file, check_tonie_file_cli, split_to_opus_files, compare_taf_files, extract_to_mp3_files, extract_full_audio_to_mp3
+from .player import interactive_player
 from .dependency_manager import get_ffmpeg_binary, get_opus_binary, ensure_dependency
 from .logger import TRACE, setup_logging, get_logger
 from .filename_generator import guess_output_filename, apply_template_to_path,ensure_directory_exists
 from .version_handler import check_for_updates, clear_version_cache
-from .recursive_processor import process_recursive_folders
-from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags
+from .recursive_processor import process_recursive_folders, find_audio_folders, get_all_audio_files_recursive
+from .media_tags import is_available as is_media_tags_available, ensure_mutagen, extract_album_info, format_metadata_filename, get_file_tags, get_all_file_tags
 from .teddycloud import TeddyCloudClient
 from .tags import get_tags
 from .tonies_json import fetch_and_update_tonies_json_v1, fetch_and_update_tonies_json_v2
 from .artwork import upload_artwork
 from .integration import handle_integration, handle_config
+
+
 
 def main():
     """Entry point for the TonieToolbox application."""
@@ -34,6 +37,8 @@ def main():
                        help='Upload to TeddyCloud instance (e.g., https://teddycloud.example.com). Supports .taf, .jpg, .jpeg, .png files.')
     teddycloud_group.add_argument('--include-artwork', action='store_true',
                        help='Upload cover artwork image alongside the Tonie file when using --upload')
+    teddycloud_group.add_argument('--assign-to-tag', action='store_true',
+                       help='Assign the uploaded file to a specific tag ID')
     teddycloud_group.add_argument('--get-tags', action='store', metavar='URL',
                        help='Get available tags from TeddyCloud instance')
     teddycloud_group.add_argument('--ignore-ssl-verify', action='store_true',
@@ -74,17 +79,23 @@ def main():
     # ------------- Parser - Librarys -------------
     parser.add_argument('-f', '--ffmpeg', help='specify location of ffmpeg', default=None)
     parser.add_argument('-o', '--opusenc', help='specify location of opusenc', default=None)
-    parser.add_argument('-b', '--bitrate', type=int, help='set encoding bitrate in kbps (default: 96)', default=96)
+    parser.add_argument('-b', '--bitrate', type=int, help='set encoding bitrate in kbps for Opus & MP3 Conversion (default: 96)', default=96)
     parser.add_argument('-c', '--cbr', action='store_true', help='encode in cbr mode')
     parser.add_argument('--auto-download', action='store_true',
                         help='automatically download ffmpeg and opusenc if not found')
-    # ------------- Parser - TAF -------------
+    # ------------- Parser - TAF -------------    
     parser.add_argument('-a', '--append-tonie-tag', metavar='TAG', action='store',
                         help='append [TAG] to filename (must be an 8-character hex value)')
     parser.add_argument('-n', '--no-tonie-header', action='store_true', help='do not write Tonie header')
     parser.add_argument('-i', '--info', action='store_true', help='Check and display info about Tonie file')
+    parser.add_argument('-p', '--play', action='store_true', help='Play TAF audio file with interactive controls')
+    parser.add_argument('--play-ui', action='store_true', help='Play TAF audio file with user interface (future implementation)')
     parser.add_argument('-s', '--split', action='store_true', help='Split Tonie file into opus tracks')
     parser.add_argument('-r', '--recursive', action='store_true', help='Process folders recursively')
+    parser.add_argument('--files-to-taf', action='store_true', 
+                        help='Convert each audio file in a directory to individual .taf files')
+    parser.add_argument('--convert-to-separate-mp3', action='store_true', help='Convert Tonie file to individual MP3 tracks')
+    parser.add_argument('--convert-to-single-mp3', action='store_true', help='Convert Tonie file to a single MP3 file')
     parser.add_argument('-O', '--output-to-source', action='store_true', 
                         help='Save output files in the source directory instead of output directory')
     parser.add_argument('-fc', '--force-creation', action='store_true', default=False,
@@ -134,9 +145,7 @@ def main():
     log_level_group.add_argument('-Q', '--silent', action='store_true', help='Show only errors')
     log_group.add_argument('--log-file', action='store_true', default=False,
                        help='Save logs to a timestamped file in .tonietoolbox folder')
-    args = parser.parse_args()
-    
-    # ------------- Parser - Source Input -------------
+    args = parser.parse_args()    # ------------- Parser - Source Input -------------
     if args.input_filename is None and not (args.get_tags or args.upload or args.install_integration or args.uninstall_integration or args.config_integration or args.auto_download):
         parser.error("the following arguments are required: SOURCE")
 
@@ -178,17 +187,25 @@ def main():
             logger.info("Update available but user chose to continue without updating.")
 
     # ------------- Autodownload & Dependency Checks -------------
-    if args.auto_download:
-        logger.debug("Auto-download requested for ffmpeg and opusenc")
-        ffmpeg_binary = get_ffmpeg_binary(auto_download=True)
-        opus_binary = get_opus_binary(auto_download=True)
-        if ffmpeg_binary and opus_binary:
-            logger.info("FFmpeg and opusenc downloaded successfully.")
-            if args.input_filename is None:
-                sys.exit(0)
-        else:
-            logger.error("Failed to download ffmpeg or opusenc. Please install them manually.")
+        # ------------- Librarys / Prereqs -------------
+    logger.debug("Checking for external dependencies")
+    ffmpeg_binary = args.ffmpeg
+    if ffmpeg_binary is None:
+        logger.debug("No FFmpeg specified, attempting to locate binary (auto_download=%s)", args.auto_download)
+        ffmpeg_binary = get_ffmpeg_binary(args.auto_download)
+        if ffmpeg_binary is None:
+            logger.error("Could not find FFmpeg. Please install FFmpeg or specify its location using --ffmpeg or use --auto-download")
             sys.exit(1)
+        logger.debug("Using FFmpeg binary: %s", ffmpeg_binary)
+
+    opus_binary = args.opusenc
+    if opus_binary is None:
+        logger.debug("No opusenc specified, attempting to locate binary (auto_download=%s)", args.auto_download)
+        opus_binary = get_opus_binary(args.auto_download) 
+        if opus_binary is None:
+            logger.error("Could not find opusenc. Please install opus-tools or specify its location using --opusenc or use --auto-download")
+            sys.exit(1)
+        logger.debug("Using opusenc binary: %s", opus_binary)
 
     # ------------- Context Menu Integration -------------
     if args.install_integration or args.uninstall_integration:
@@ -207,10 +224,158 @@ def main():
         else:
             logger.error("FFmpeg and opusenc are required for context menu integration")
             sys.exit(1)    
+
     if args.config_integration:
         logger.debug("Opening configuration file for editing")
         handle_config()
         sys.exit(0)
+          # ------------- Files to TAF Processing -------------
+    if args.files_to_taf:
+        if args.recursive:
+            logger.info("Processing individual files to separate TAF files recursively: %s", args.input_filename)
+        else:
+            logger.info("Processing individual files to separate TAF files: %s", args.input_filename)
+        
+        if not os.path.isdir(args.input_filename):
+            logger.error("--files-to-taf requires a directory as input")
+            sys.exit(1)
+        
+        # Use recursive file discovery if --recursive flag is also specified
+        if args.recursive:
+            audio_files = get_all_audio_files_recursive(args.input_filename)
+        else:
+            audio_files = get_input_files(args.input_filename)
+        
+        if not audio_files:
+            search_type = "recursively" if args.recursive else "in directory"
+            logger.error("No audio files found %s: %s", search_type, args.input_filename)
+            sys.exit(1)
+            
+        logger.info("Found %d audio files to convert", len(audio_files))
+        
+        output_dir = args.input_filename if args.output_to_source else './output'
+        
+        if not args.output_to_source and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            logger.debug("Created output directory: %s", output_dir)
+        
+        created_files = []
+        for file_index, audio_file in enumerate(audio_files):
+            # Generate output filename based on the original file
+            base_name = os.path.splitext(os.path.basename(audio_file))[0]
+            
+            # Apply media tag naming if requested
+            if args.use_media_tags:
+                tags = get_file_tags(audio_file)
+                if tags:
+                    template = args.name_template or "{artist} - {title}"
+                    new_name = format_metadata_filename(tags, template)
+                    if new_name:
+                        logger.debug("Using media tags for file naming: %s -> %s", base_name, new_name)
+                        base_name = new_name
+            
+            # Apply tonie tag if specified
+            if args.append_tonie_tag:
+                hex_tag = args.append_tonie_tag
+                if not all(c in '0123456789abcdefABCDEF' for c in hex_tag) or len(hex_tag) != 8:
+                    logger.error("TAG must be an 8-character hexadecimal value")
+                    sys.exit(1)
+                base_name = append_to_filename(base_name, hex_tag)
+            
+            output_filename = os.path.join(output_dir, f"{base_name}.taf")
+            
+            # Check if file already exists
+            skip_creation = False
+            if os.path.exists(output_filename):
+                logger.warning("Output file already exists: %s", output_filename)
+                valid_taf = check_tonie_file_cli(output_filename)
+                
+                if valid_taf and not args.force_creation:
+                    logger.warning("Valid Tonie file exists, skipping: %s", output_filename)
+                    skip_creation = True
+                else:
+                    logger.info("Output file exists but is not valid, proceeding to create new one")
+            
+            logger.info("[%d/%d] Converting: %s -> %s", 
+                      file_index + 1, len(audio_files), os.path.basename(audio_file), os.path.basename(output_filename))
+            
+            if not skip_creation:
+                try:
+                    create_tonie_file(output_filename, [audio_file], args.no_tonie_header, args.user_timestamp,
+                                   args.bitrate, not args.cbr, ffmpeg_binary, opus_binary, args.keep_temp, 
+                                   args.auto_download, not args.use_legacy_tags, 
+                                   no_mono_conversion=args.no_mono_conversion)
+                    logger.info("Successfully created: %s", output_filename)
+                except Exception as e:
+                    logger.error("Failed to create %s: %s", output_filename, str(e))
+                    continue
+            
+            created_files.append(output_filename)
+            
+            # Handle upload if requested
+            if args.upload:
+                upload_path = args.path
+                if upload_path and '{' in upload_path and args.use_media_tags:
+                    metadata = get_file_tags(audio_file)
+                    if metadata:
+                        formatted_path = apply_template_to_path(upload_path, metadata)
+                        if formatted_path:
+                            logger.info("Using dynamic upload path from template: %s", formatted_path)
+                            upload_path = formatted_path
+                        else:
+                            logger.warning("Could not apply all tags to path template '%s'. Using as-is.", upload_path)
+                
+                # Create directories recursively if path is provided
+                if upload_path:
+                    logger.debug("Creating directory structure on server: %s", upload_path)
+                    try:
+                        client.create_directories_recursive(
+                            path=upload_path, 
+                            special=args.special_folder
+                        )
+                        logger.debug("Successfully created directory structure on server")
+                    except Exception as e:
+                        logger.warning("Failed to create directory structure on server: %s", str(e))
+                        logger.debug("Continuing with upload anyway, in case the directory already exists")
+                
+                response = client.upload_file(
+                    file_path=output_filename,
+                    destination_path=upload_path,                    
+                    special=args.special_folder,
+                )
+                upload_success = response.get('success', False)
+                
+                if not upload_success:
+                    logger.error("Failed to upload %s to TeddyCloud", output_filename)
+                else:
+                    logger.info("Successfully uploaded %s to TeddyCloud", output_filename)
+                
+                # Handle artwork upload
+                artwork_url = None
+                if args.include_artwork:
+                    success, artwork_url = upload_artwork(client, output_filename, os.path.dirname(audio_file), [audio_file])
+                    if success:
+                        logger.info("Successfully uploaded artwork for %s", output_filename)
+                    else:
+                        logger.warning("Failed to upload artwork for %s", output_filename)
+                
+                # Handle custom JSON creation
+                if args.create_custom_json:
+                    json_output_dir = args.input_filename if args.output_to_source else output_dir
+                    client_param = client if 'client' in locals() else None
+                    if args.version_2:
+                        logger.debug("Using version 2 of the Tonies JSON format")
+                        success = fetch_and_update_tonies_json_v2(client_param, output_filename, [audio_file], artwork_url, json_output_dir)
+                    else:
+                        success = fetch_and_update_tonies_json_v1(client_param, output_filename, [audio_file], artwork_url, json_output_dir)
+                    if success:
+                        logger.info("Successfully updated Tonies JSON for %s", output_filename)
+                    else:
+                        logger.warning("Failed to update Tonies JSON for %s", output_filename)
+        
+        logger.info("Files to TAF processing completed. Created %d Tonie files.", len(created_files))
+        sys.exit(0)
+        
         # ------------- Normalize Path Input -------------
     if args.input_filename:
         logger.debug("Original input path: %s", args.input_filename)
@@ -258,7 +423,7 @@ def main():
             logger.error("No files found for pattern %s", args.input_filename)
             sys.exit(1)
         for file_index, file_path in enumerate(files):
-            tags = get_file_tags(file_path)
+            tags = get_all_file_tags(file_path)
             if tags:
                 print(f"\nFile {file_index + 1}: {os.path.basename(file_path)}")
                 print("-" * 40)
@@ -323,6 +488,21 @@ def main():
                 logger.info("Successfully uploaded %s to TeddyCloud", file_path)
                 logger.debug("Upload response details: %s", 
                           {k: v for k, v in response.items() if k != 'success'})
+                if args.assign_to_tag:
+                    tag_id = input("Enter the tag ID to assign the uploaded file: eg. 'E0:04:03:50:11:AA:7E:81': ").strip()
+                    fileName = os.path.basename(file_path)
+                    if upload_path:
+                        libPath = f"lib://{upload_path}/{fileName}"
+                    else:
+                        libPath = f"lib://{fileName}"
+                    logger.info("Assigning uploaded file %s to tag ID: %s", fileName, tag_id)
+                    logger.debug("Library path for assignment: %s", libPath)
+                    success = client.assign_tag_path(libPath, tag_id)
+                    if success:
+                        logger.info("Successfully assigned tag %s to %s", tag_id, fileName)
+                    else:
+                        logger.warning("Failed to assign tag %s to %s", tag_id, fileName)
+
             artwork_url = None
             if args.include_artwork and file_path.lower().endswith('.taf'):
                 source_dir = os.path.dirname(file_path)
@@ -500,6 +680,23 @@ def main():
             logger.info("Comparing Tonie files: %s and %s", args.input_filename, args.compare)
             result = compare_taf_files(args.input_filename, args.compare, args.detailed_compare)
             sys.exit(0 if result else 1)
+        elif args.play:
+            logger.info("Playing Tonie file: %s", args.input_filename)
+            interactive_player(args.input_filename)
+            sys.exit(0)        
+        elif args.play_ui:
+            logger.warning("Nothing to see here yet!")
+            logger.info("This is for future implementation of a minimal GUI player.")
+            logger.info("Playing Tonie file with user interface: %s", args.input_filename)
+            sys.exit(0)
+        elif args.convert_to_separate_mp3:
+            logger.info("Converting Tonie file to separate MP3 tracks: %s", args.input_filename)
+            extract_to_mp3_files(args.input_filename, args.output_filename, args.bitrate)
+            sys.exit(0)
+        elif args.convert_to_single_mp3:
+            logger.info("Converting Tonie file to single MP3: %s", args.input_filename)
+            extract_full_audio_to_mp3(args.input_filename, args.output_filename, args.bitrate)
+            sys.exit(0)
 
     files = get_input_files(args.input_filename)
     logger.debug("Found %d files to process", len(files))
@@ -600,7 +797,7 @@ def main():
                     out_filename = formatted_path
                 logger.info("Using template path for output: %s", out_filename)
             else:
-                logger.warning("Could not apply template to path. Using default output location.")
+                logger.warning("Could not apply template to path. Using default output handling.")
                 # Fall back to default output handling
                 if guessed_name:
                     logger.debug("Using guessed name for output: %s", guessed_name)
@@ -615,7 +812,7 @@ def main():
                         out_filename = os.path.join(output_dir, guessed_name)
                         logger.debug("Using default output location: %s", out_filename)
         else:
-            logger.warning("No metadata available to apply to template path. Using default output location.")
+            logger.warning("No metadata available to apply to template path. Using default output handling.")
             # Fall back to default output handling
     elif guessed_name:
         logger.debug("Using guessed name for output: %s", guessed_name)

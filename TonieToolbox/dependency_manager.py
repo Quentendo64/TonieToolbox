@@ -945,6 +945,66 @@ def get_ffmpeg_binary(auto_download=False):
         logger.warning("FFmpeg is not available and --auto-download is not used.")
         return None
 
+def get_ffplay_binary(auto_download=False):
+    """
+    Get the path to the FFplay binary, downloading it if necessary and allowed.
+    FFplay is typically included with FFmpeg installations.
+    
+    Args:
+        auto_download (bool): Whether to automatically download FFplay if not found (defaults to False)
+        
+    Returns:
+        str: Path to the FFplay binary, or None if not available
+    """
+    logger.debug("Getting FFplay binary")
+    
+    # Define the expected binary path
+    local_dir = os.path.join(get_user_data_dir(), 'libs', 'ffmpeg')
+    if sys.platform == 'win32':
+        binary_path = os.path.join(local_dir, 'ffplay.exe')
+    else:
+        binary_path = os.path.join(local_dir, 'ffplay')
+    
+    # Check if binary exists
+    if os.path.exists(binary_path) and os.path.isfile(binary_path):
+        logger.debug("FFplay binary found at %s", binary_path)
+        return binary_path
+    
+    # Check if a system-wide FFplay is available
+    try:
+        if sys.platform == 'win32':
+            # On Windows, look for ffplay in PATH
+            from shutil import which
+            system_binary = which('ffplay')
+            if system_binary:
+                logger.debug("System-wide FFplay found at %s", system_binary)
+                return system_binary
+        else:
+            # On Unix-like systems, use 'which' command
+            system_binary = subprocess.check_output(['which', 'ffplay']).decode('utf-8').strip()
+            if system_binary:
+                logger.debug("System-wide FFplay found at %s", system_binary)
+                return system_binary
+    except (subprocess.SubprocessError, FileNotFoundError):
+        logger.debug("No system-wide FFplay found")
+    
+    # If FFplay is not found but auto_download is enabled, try to get FFmpeg first
+    # since FFplay is usually bundled with FFmpeg
+    if auto_download:
+        logger.info("FFplay not found, attempting to get FFmpeg (which includes FFplay)")
+        ffmpeg_path = get_ffmpeg_binary(auto_download=True)
+        if ffmpeg_path:
+            # Check if ffplay was included in the FFmpeg download
+            if os.path.exists(binary_path) and os.path.isfile(binary_path):
+                logger.info("FFplay found after FFmpeg download: %s", binary_path)
+                return binary_path
+        
+        logger.warning("FFplay not available even after FFmpeg download")
+        return None
+    else:
+        logger.warning("FFplay is not available and --auto-download is not used.")
+        return None
+
 def get_opus_binary(auto_download=False):
     """
     Get the path to the Opus binary, downloading it if necessary and allowed.

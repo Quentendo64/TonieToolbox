@@ -216,16 +216,21 @@ class TeddyCloudClient:
         response = self._make_request('GET', '/api/fileIndex')
         return response.json()
     
-    def get_file_index_v2(self) -> dict:
+    def get_file_index_v2(self,file_path: str = None, special: str = None) -> dict:
         """
         Get version 2 file index data from the TeddyCloud server.
         
         Returns:
             dict: JSON response containing version 2 file index data
         """
-        response = self._make_request('GET', '/api/fileIndexV2')
+        params = {}
+        if file_path:
+            params['file_path'] = file_path
+        if special:
+            params['special'] = special
+        response = self._make_request('GET', '/api/fileIndexV2', params=params)
         return response.json()
-    
+
     def get_tonieboxes_json(self) -> dict:
         """
         Get Tonieboxes JSON data from the TeddyCloud server.
@@ -333,7 +338,77 @@ class TeddyCloudClient:
                 'status_code': response.status_code,
                 'message': response.text
             }
-    
+
+    def assign_tag_path(self, lib_path: str, tag_id: str, overlay: str = None, nocloud: bool = True, live: bool = False) -> dict:
+        """
+        Assign a new source path to a tag on the TeddyCloud server.
+
+        Args:
+            lib_path (str): Library path to assign to the tag (source path)
+            tag_id (str): Tag ID to assign the path to
+            overlay (str | None): Settings overlay ID (optional)
+        Returns:
+            dict: Response information including success status and message
+        """
+        params = {}
+        form_data = {}
+        if not lib_path.startswith('lib://'):
+            raise ValueError("Library path must start with 'lib://'")
+        api_tag_id = self._reverse_byte_order(tag_id)
+        if overlay:
+            params['overlay'] = overlay
+        if lib_path:
+            form_data['source'] = lib_path
+        if nocloud:
+            form_data['nocloud'] = 'true'
+        else:
+            form_data['nocloud'] = 'false'
+        if live:
+            form_data['live'] = 'true'
+        else:
+            form_data['live'] = 'false'
+        logger.debug(f"Assigning tag path '{lib_path}' to tag ID '{tag_id}' at endpoint {api_tag_id} with overlay '{overlay}'")
+
+        try:
+            response = self._make_request('POST', f'/content/json/set/{api_tag_id}', params=params, data=form_data)
+            logger.debug(f"Tag assignment request URL: {response.url}")
+            logger.debug(f"Tag assignment response status: {response.status_code}")
+            logger.debug(f"Tag assignment response text: {response.text}")
+            
+            return {
+                'success': True,
+                'status_code': response.status_code,
+                'message': response.text,
+                'url': response.url
+            }
+        except Exception as e:
+            logger.error(f"Failed to assign tag path: {e}")
+            return {
+                'success': False,
+                'status_code': getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None,
+                'message': str(e),
+                'url': None
+            }
+        
+    def _reverse_byte_order(self, hex_string: str) -> str:
+        """
+        Reverse the byte order of a hex string (little-endian conversion).
+
+        Args:
+            hex_string (str): Hexadecimal string to reverse (e.g., "E0:04:03:50:11:AA:7E:81")
+
+        Returns:
+            str: Reversed hexadecimal lower string without colons (e.g., "817e11a50304e0")
+        """
+        if hex_string.endswith('04e0'):
+            logger.debug("Hex string ends with '04e0', returning as is")
+            return hex_string
+        else:
+            logger.debug(f"Reversing byte order for hex string: {hex_string}")
+            hex_without_colons = hex_string.replace(":", "")
+            byte_pairs = [hex_without_colons[i:i+2] for i in range(0, len(hex_without_colons), 2)]
+            return ''.join(reversed(byte_pairs)).lower()
+        
     # ------------- Custom API Methods -------------
 
     def _get_paths_cache_file(self) -> str:

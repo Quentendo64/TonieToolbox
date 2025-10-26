@@ -195,6 +195,101 @@ def get_file_tags(file_path: str) -> Dict[str, Any]:
         logger.error("Error reading tags from file %s: %s", file_path, str(e))
         return tags
 
+def get_all_file_tags(file_path: str) -> Dict[str, Any]:
+    """
+    Extract ALL metadata tags from an audio file, excluding artwork/picture data.
+    
+    This function returns all tags present in the file, not just the ones
+    defined in TAG_MAPPINGS. Tag names are returned as-is from the file format.
+    APIC (Attached Picture) tags and other artwork-related tags are excluded.
+    
+    Args:
+        file_path: Path to the audio file
+        
+    Returns:
+        Dictionary containing all tag names and values found in the file
+        (excluding artwork/picture tags)
+    """
+    global MUTAGEN_AVAILABLE
+    
+    if not MUTAGEN_AVAILABLE:
+        if ensure_mutagen(auto_install=True):
+            if not _import_mutagen():
+                logger.warning("Mutagen library not available. Cannot read media tags.")
+                return {}
+        else:
+            logger.warning("Mutagen library not available. Cannot read media tags.")
+            return {}
+        
+    logger.debug("Reading all tags from file: %s", file_path)
+    tags = {}
+    
+    try:
+        audio = mutagen.File(file_path)
+        if audio is None:
+            logger.warning("Could not identify file format: %s", file_path)
+            return tags
+        if isinstance(audio, ID3) or hasattr(audio, 'ID3'):
+            try:
+                id3 = audio if isinstance(audio, ID3) else audio.ID3
+                for tag_key, tag_value in id3.items():
+                    # Skip APIC (Attached Picture) tags
+                    if hasattr(tag_value, 'FrameID') and tag_value.FrameID == 'APIC':
+                        continue
+                    tag_value_str = str(tag_value)
+                    tags[tag_key] = normalize_tag_value(tag_value_str)
+            except (AttributeError, TypeError) as e:
+                logger.debug("Error accessing ID3 tags: %s", e)
+                try:
+                    if hasattr(audio, 'tags') and audio.tags:
+                        for tag_key in audio.tags.keys():
+                            if tag_key.startswith('APIC'):
+                                continue
+                            tag_value = audio.tags[tag_key]
+                            if hasattr(tag_value, 'text'):
+                                tag_value_str = str(tag_value.text[0]) if tag_value.text else ''
+                            else:
+                                tag_value_str = str(tag_value)
+                            tags[tag_key] = normalize_tag_value(tag_value_str)
+                except Exception as e:
+                    logger.debug("Alternative ID3 tag reading failed: %s", e)
+        elif isinstance(audio, (FLAC, OggOpus, OggVorbis)):
+            for tag_key, tag_values in audio.items():
+                if tag_key.lower() in ('metadata_block_picture', 'coverart', 'cover'):
+                    continue
+                tag_value = tag_values[0] if tag_values else ''
+                tags[tag_key] = normalize_tag_value(tag_value)
+        elif isinstance(audio, MP4):
+            for tag_key, tag_value in audio.items():
+                # Skip cover art (covr atom)
+                if tag_key == 'covr':
+                    continue
+                if isinstance(tag_value, list):
+                    if tag_key in ('trkn', 'disk'):
+                        if tag_value and isinstance(tag_value[0], tuple) and len(tag_value[0]) >= 1:
+                            tags[tag_key] = str(tag_value[0][0])
+                    else:
+                        tag_value_str = str(tag_value[0]) if tag_value else ''
+                        tags[tag_key] = normalize_tag_value(tag_value_str)
+                else:
+                    tag_value_str = str(tag_value)
+                    tags[tag_key] = normalize_tag_value(tag_value_str)
+        else:
+            for tag_key, tag_value in audio.items():
+                if isinstance(tag_value, list):
+                    tag_value_str = str(tag_value[0]) if tag_value else ''
+                    tags[tag_key] = normalize_tag_value(tag_value_str)
+                else:
+                    tag_value_str = str(tag_value)
+                    tags[tag_key] = normalize_tag_value(tag_value_str)
+                        
+        logger.debug("Successfully read %d total tags from file", len(tags))
+        logger.debug("All tags: %s", str(tags))
+        return tags
+    except Exception as e:
+        logger.error("Error reading all tags from file %s: %s", file_path, str(e))
+        return tags
+
 def extract_first_audio_file_tags(folder_path: str) -> Dict[str, str]:
     """
     Extract tags from the first audio file in a folder.

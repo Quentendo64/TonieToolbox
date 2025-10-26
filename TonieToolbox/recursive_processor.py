@@ -339,3 +339,31 @@ def process_recursive_folders(root_path: str, use_media_tags: bool = False, name
     
     logger.info("Created %d processing tasks", len(results))
     return results
+
+def get_all_audio_files_recursive(root_path: str) -> list[str]:
+    """
+    Get all audio files recursively from a directory tree.
+    
+    Args:
+        root_path (str): Root directory to search
+        
+    Returns:
+        list[str]: List of all audio files found recursively
+    """
+    logger.debug("Getting all audio files recursively from: %s", root_path)
+    
+    # Use the existing find_audio_folders function to get all folders with audio files
+    all_folders = find_audio_folders(root_path)
+    
+    # Extract all audio files from all folders
+    all_audio_files = []
+    for folder_info in all_folders:
+        audio_files = folder_info['audio_files']
+        all_audio_files.extend(audio_files)
+        logger.debug("Found %d audio files in folder: %s", len(audio_files), folder_info['path'])
+    
+    # Sort files for consistent processing order
+    all_audio_files.sort()
+    
+    logger.info("Found %d total audio files recursively", len(all_audio_files))
+    return all_audio_files

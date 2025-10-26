@@ -177,8 +177,10 @@ class WindowsClassicContextMenuIntegration:
                 self.basic_authentication = True
             self.client_cert_path = upload_config.get('client_cert_path', '')
             self.client_cert_key_path = upload_config.get('client_cert_key_path', '')
-            if self.client_cert_path and self.client_cert_key_path:
-                self.client_cert_cmd = f'--client-cert {self.client_cert_path} --client-cert-key {self.client_cert_key_path}'
+            if self.client_cert_path and self.client_cert_key_path:                # Escape paths for registry use (double backslashes)
+                cert_path_escaped = self.client_cert_path.replace('\\', '\\\\')
+                key_path_escaped = self.client_cert_key_path.replace('\\', '\\\\')
+                self.client_cert_cmd = f'--client-cert "{cert_path_escaped}" --client-key "{key_path_escaped}"'
                 self.client_cert_authentication = True
             if self.client_cert_authentication and self.basic_authentication:
                 logger.warning("Both client certificate and basic authentication are set. Only one can be used.")
