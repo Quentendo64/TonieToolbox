@@ -46,7 +46,31 @@ def handle_integration(args):
     elif platform.system() == 'Darwin':
         raise NotImplementedError("Context menu integration is not supported on MacOS YET. But Soon™")
     elif platform.system() == 'Linux':
-        raise NotImplementedError("Context menu integration is not supported on Linux YET. But Soon™")
+        # Check if we're running in KDE
+        kde_session = os.environ.get('KDE_SESSION_VERSION') or os.environ.get('KDE_FULL_SESSION')
+        desktop_session = os.environ.get('DESKTOP_SESSION', '').lower()
+        xdg_current_desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+        
+        if kde_session or 'kde' in desktop_session or 'kde' in xdg_current_desktop:
+            from .integration_kde import KDEServiceMenuIntegration as ContextMenuIntegration
+            if args.install_integration:
+                success = ContextMenuIntegration.install()
+                if success:
+                    logger.info("Integration installed successfully.")
+                    return True
+                else:
+                    logger.error("Integration installation failed.")
+                    return False
+            elif args.uninstall_integration:
+                success = ContextMenuIntegration.uninstall()
+                if success:
+                    logger.info("Integration uninstalled successfully.")
+                    return True
+                else:
+                    logger.error("Integration uninstallation failed.")
+                    return False
+        else:
+            raise NotImplementedError("Context menu integration is currently only supported on KDE. Other Linux desktop environments are not supported yet.")
     else:
         raise NotImplementedError(f"Context menu integration is not supported on this OS: {platform.system()}")
     
@@ -68,6 +92,18 @@ def handle_config():
         context_menu._apply_config_template()
         subprocess.call(["open", config_path])
     elif platform.system() == "Linux":
+        kde_session = os.environ.get('KDE_SESSION_VERSION') or os.environ.get('KDE_FULL_SESSION')
+        desktop_session = os.environ.get('DESKTOP_SESSION', '').lower()
+        xdg_current_desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+        
+        if kde_session or 'kde' in desktop_session or 'kde' in xdg_current_desktop:
+            try:
+                from .integration_kde import KDEServiceMenuIntegration as ContextMenuIntegration
+                context_menu = ContextMenuIntegration()
+                context_menu._apply_config_template()
+            except Exception as e:
+                logger.warning(f"Could not create config template: {e}")
+        
         subprocess.call(["xdg-open", config_path])
     else:
         logger.error(f"Unsupported OS: {platform.system()}")
