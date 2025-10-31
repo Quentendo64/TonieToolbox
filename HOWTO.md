@@ -3,15 +3,15 @@
 Welcome to TonieToolbox! This simple guide will help you create your own custom audio content for Tonie boxes - even if you're not tech-savvy.
 
 ## 📋 Table of Contents
-- [Before You Begin](#before-you-begin)
-- [Installing Python](#installing-python)
+- [Before You Begin](#-before-you-begin)
+- [Installing Python](#-installing-python)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Linux](#linux)
-- [Installing TonieToolbox](#installing-tonietoolbox)
-- [Quick Start Guide](#quick-start-guide)
-- [Common Tasks](#common-tasks)
-- [Troubleshooting](#troubleshooting)
+- [Installing TonieToolbox](#-installing-tonietoolbox)
+- [Quick Start Guide](#-quick-start-guide)
+- [Common Tasks](#-common-tasks)
+- [Troubleshooting](#-troubleshooting)
 
 ## 🚀 Before You Begin
 
