@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Convert audio files to Toniebox compatible format (.TAF) and interact with TeddyCloud."
 readme = "README.md"
 requires-python = ">=3.7"
-license = "GPL-3.0-or-later"
+license = { file = "LICENSE.md" }
 authors = [
     {name = "Quentendo64", email = "quentin@wohlfeil.at"}
 ]
