@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Removed
 
+## [1.0.0a1] - 2025-12-05
+
+This Project is moved to a new place and organization. This Repository will no longer be updated and will live as an archive. Please find the new repository here: [TonieToolbox/TonieToolbox](https://www.github.com/TonieToolbox/TonieToolbox)
+
+
 ## [0.6.5] - 2025-10-25
 ### Added
 - Implemented minimal GUI player using tkinter with --play-ui option
